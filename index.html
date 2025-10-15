@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="sk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Analýza Meteorologických Dát</title>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body id="body-main">
+
+<div class="container">
+    
+    <div class="theme-toggle-wrapper">
+        <button id="themeToggle" class="theme-toggle" onclick="toggleTheme()">
+            <span id="themeIcon">☀️</span> Prepni na Tmavý Motív
+        </button>
+    </div>
+
+    <h1>Analýza Meteorologických Dát</h1>
+    <p class="intro">
+        Vitajte v nástroji na agregáciu dát z meteostanice. Pre zabezpečenie presnosti pri neúplných dátach ponúkame rôzne metodiky spracovania.
+    </p>
+
+    <div class="methods-header">
+        <h2>Vysvetlenie Metód spracovania dát</h2>
+        <button id="collapseButton" class="collapse-btn" onclick="toggleMethods()">
+            Zbaliť Popisy ▲
+        </button>
+    </div>
+    
+    <div id="collapsibleContent" class="collapsible-content">
+        <div class="methods-section">
+            <div class="method-group">
+                <div class="method-box">
+                    <h3>A. Naivný Aritmetický Priemer (default: `naive`)</h3>
+                    <p><strong>Logika:</strong> Súčet dostupných meraní / Počet dostupných meraní. Ignoruje chýbajúce dáta. <strong>Vhodné pre:</strong> Transparentnosť.</p>
+                </div>
+                <div class="method-box">
+                    <h3>B. Priemer s Interpoláciou (Odhad 24h) (kód: `interpolated`)</h3>
+                    <p><strong>Logika:</strong> (Bude implementované) Chýbajúce body sú odhadnuté a priemer sa počíta zo 144 bodov (celý deň). <strong>Vhodné pre:</strong> Robustný odhad skutočného denného priemeru.</p>
+                </div>
+            </div>
+            <div class="method-group">
+                <div class="method-box">
+                    <h3>D. Simple Móda (Všetky dáta) (kód: `simpleMode`)</h3>
+                    <p><strong>Logika:</strong> Najčastejší smer zo všetkých 10-minútových záznamov. <strong>Vhodné pre:</strong> Kompletnú štatistiku, vrátane šumu.</p>
+                </div>
+                <div class="method-box">
+                    <h3>E. Filtrovaná Móda (Meteorologický štandard) (default: `filteredMode`)</h3>
+                    <p><strong>Logika:</strong> Započítané sú iba záznamy, kde rýchlosť vetra **presahuje 0.5 m/s**. <strong>Vhodné pre:</strong> Elimináciu šumu a presné určenie prevládajúceho smeru.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <h2>Nastavenia Zobrazenia a Metódy</h2>
+    <div class="control-panel">
+        <div><label for="viewMode">Režim zobrazenia</label><select id="viewMode"><option value="month">Mesačný prehľad</option><option value="day">Denný prehľad</option></select></div>
+        <div><label for="dateInput">Vybrať Obdobie</label><input type="month" id="dateInput" value="2025-09"></div>
+        <div><label for="avgMethod">Metóda priemeru</label><select id="avgMethod"><option value="naive">A. Naivný Priemer</option><option value="interpolated" disabled>B. Priemer s Interpoláciou (TODO)</option></select></div>
+        <div><label for="windMethod">Metóda Smeru Vetra</label><select id="windMethod"><option value="filteredMode">E. Filtrovaná Móda (Štandard)</option><option value="simpleMode">D. Simple Móda (Všetky dáta)</option></select></div>
+        <div style="display: flex; align-items: flex-end;"><button id="loadDataButton">Zobraziť Dáta</button></div>
+    </div>
+
+    <div class="output-section">
+        <h2>Výsledok agregácie pre obdobie: <span id="selected-period">--</span></h2>
+        
+        <div id="summary-dashboard" class="summary-dashboard" style="display: none;">
+            <div class="summary-box">
+                <h4>Teplota</h4>
+                <div class="data-points">
+                    <div class="data-point"><span>Maximum</span><span class="value" id="summary-temp-max">- °C <span class="timestamp" id="summary-temp-max-time"></span></span></div>
+                    <div class="data-point"><span>Priemer</span><span class="value" id="summary-temp-avg">- °C</span></div>
+                    <div class="data-point"><span>Minimum</span><span class="value" id="summary-temp-min">- °C <span class="timestamp" id="summary-temp-min-time"></span></span></div>
+                </div>
+            </div>
+            <div class="summary-box">
+                <h4>Vlhkosť</h4>
+                <div class="data-points">
+                    <div class="data-point"><span>Maximum</span><span class="value" id="summary-hum-max">- % <span class="timestamp" id="summary-hum-max-time"></span></span></div>
+                    <div class="data-point"><span>Priemer</span><span class="value" id="summary-hum-avg">- %</span></div>
+                    <div class="data-point"><span>Minimum</span><span class="value" id="summary-hum-min">- % <span class="timestamp" id="summary-hum-min-time"></span></span></div>
+                </div>
+            </div>
+            <div class="summary-box">
+                <h4>Tlak</h4>
+                <div class="data-points">
+                    <div class="data-point"><span>Maximum</span><span class="value" id="summary-press-max">- hPa <span class="timestamp" id="summary-press-max-time"></span></span></div>
+                    <div class="data-point"><span>Priemer</span><span class="value" id="summary-press-avg">- hPa</span></div>
+                    <div class="data-point"><span>Minimum</span><span class="value" id="summary-press-min">- hPa <span class="timestamp" id="summary-press-min-time"></span></span></div>
+                </div>
+            </div>
+            <div class="summary-box">
+                <h4>Rýchlosť Vetra</h4>
+                <div class="data-points">
+                    <div class="data-point"><span>Maximum</span><span class="value" id="summary-wind-speed-max">- m/s <span class="timestamp" id="summary-wind-speed-max-time"></span></span></div>
+                    <div class="data-point"><span>Priemer</span><span class="value" id="summary-wind-speed-avg">- m/s</span></div>
+                    <div class="data-point"><span>Smer</span><span class="value" id="summary-wind-dir">-</span></div>
+                </div>
+            </div>
+            <div class="summary-box">
+                <h4>Nárazy Vetra</h4>
+                <div class="data-points">
+                    <div class="data-point"><span>Maximum</span><span class="value" id="summary-wind-gust-max">- m/s <span class="timestamp" id="summary-wind-gust-max-time"></span></span></div>
+                    <div class="data-point"><span>Minimum > 0</span><span class="value" id="summary-wind-gust-min">- m/s <span class="timestamp" id="summary-wind-gust-min-time"></span></span></div>
+                </div>
+            </div>
+            <div class="summary-box">
+                <h4>Zrážky</h4>
+                <div class="data-points">
+                    <div class="data-point single-value"><span>Úhrn</span><span class="value" id="summary-rain">- mm</span></div>
+                </div>
+            </div>
+            <div class="summary-box">
+                <h4>Žiarenie</h4>
+                 <div class="data-points">
+                    <div class="data-point"><span>Max. solárne</span><span class="value" id="summary-solar">- W/m² <span class="timestamp" id="summary-solar-max-time"></span></span></div>
+                    <div class="data-point"><span>Max. UV Index</span><span class="value" id="summary-uv">- <span class="timestamp" id="summary-uv-max-time"></span></span></div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="responsive-table"> 
+             <div id="json-data" class="placeholder-data"><p>Vyberte dáta a metódu a kliknite na "Zobraziť Dáta".</p></div>
+        </div>
+    </div>
+</div>
+
+<script>
+    function toggleTheme(){const e=document.getElementById("body-main"),t=document.getElementById("themeToggle"),o=e.classList.toggle("dark-mode");localStorage.setItem("theme",o?"dark":"light"),t.innerHTML=o?"🌙 Prepni na Svetlý Motív":"☀️ Prepni na Tmavý Motív"}function toggleMethods(){const e=document.getElementById("collapsibleContent"),t=document.getElementById("collapseButton"),o=e.classList.toggle("collapsed");t.innerHTML=o?"Rozbaliť Popisy ▼":"Zbaliť Popisy ▲",localStorage.setItem("methodsCollapsed",o?"true":"false")}document.addEventListener("DOMContentLoaded",()=>{const e=localStorage.getItem("theme");"dark"===e&&(document.getElementById("body-main").classList.add("dark-mode"),document.getElementById("themeToggle").innerHTML="🌙 Prepni na Svetlý Motív");const t=localStorage.getItem("methodsCollapsed");"true"===t&&document.getElementById("collapsibleContent").classList.add("collapsed",document.getElementById("collapseButton").innerHTML="Rozbaliť Popisy ▼")});
+</script>
+
+<script type="module" src="js/main.js"></script>
+
+</body>
+</html>
