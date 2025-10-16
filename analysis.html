@@ -31,11 +31,13 @@
     </div>
 
     <h1>Detailná Analýza Dát</h1>
-    <p class="intro">
-        Zvoľte si jednu alebo dve premenné a časový rozsah pre zobrazenie detailných štatistík a grafu.
-    </p>
-
+    
     <h2>Nastavenia Analýzy</h2>
+
+    <div id="data-availability-analysis" class="data-availability-info">
+        <p>Načítavam informácie o dostupných dátach...</p>
+    </div>
+
     <div class="control-panel analysis-panel">
         <div>
             <label for="variableSelect1">1. Premenná (ľavá os)</label>
@@ -50,8 +52,7 @@
         </div>
         <div>
             <label for="variableSelect2">2. Premenná (pravá os)</label>
-            <select id="variableSelect2">
-                </select>
+            <select id="variableSelect2"></select>
         </div>
         <div>
             <label for="dateFrom">Dátum od</label>
@@ -75,7 +76,7 @@
     </div>
 
     <div id="placeholder-analysis" class="placeholder-data">
-        <p>Zvoľte premennú a rozsah dátumov a kliknite na "Analyzovať Obdobie".<br><small>Dostupné sú dáta len pre mesiace, ku ktorým existuje JSON súbor.</small></p>
+        <p>Zvoľte premennú a rozsah dátumov a kliknite na "Analyzovať Obdobie".</p>
     </div>
 </div>
 </main>
