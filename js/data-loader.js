@@ -3,28 +3,28 @@ import { formatTimestampToLocalDate } from './utils.js';
 
 let dataCache = {};
 
-// Pomocná funkcia na získanie YYYY-MM z názvu súboru
+/**
+ * NOVÁ FUNKCIA: Načíta zoznam dostupných súborov z manifest.json
+ */
+export async function fetchAvailableFiles() {
+    try {
+        const response = await fetch('data/manifest.json');
+        if (!response.ok) throw new Error('Manifest súbor nebol nájdený.');
+        const manifest = await response.json();
+        return manifest.availableFiles || [];
+    } catch (error) {
+        console.error("Chyba pri načítaní manifestu:", error);
+        return [];
+    }
+}
+
 const getYearMonthFromFile = (filename) => filename.replace('.json', '').replace('_', '-');
 
-/**
- * Zistí dostupný rozsah dátumov na základe existujúcich JSON súborov.
- * @param {string[]} fileList - Zoznam potenciálnych súborov.
- * @returns {Promise<{min: string, max: string}>} - Minimálny a maximálny dostupný dátum.
- */
 export async function getAvailableDateRange(fileList) {
-    const availableMonths = [];
-    for (const file of fileList) {
-        try {
-            const response = await fetch(`data/${file}`, { method: 'HEAD' });
-            if (response.ok) {
-                availableMonths.push(getYearMonthFromFile(file));
-            }
-        } catch (e) { /* Súbor neexistuje, ignorujeme */ }
-    }
+    if (fileList.length === 0) return { min: null, max: null };
 
-    if (availableMonths.length === 0) return { min: null, max: null };
-
-    availableMonths.sort();
+    const availableMonths = fileList.map(getYearMonthFromFile).sort();
+    
     const minMonth = availableMonths[0];
     const maxMonth = availableMonths[availableMonths.length - 1];
     
@@ -38,13 +38,6 @@ export async function getAvailableDateRange(fileList) {
     };
 }
 
-/**
- * Načíta a spojí dáta pre zvolený časový rozsah.
- * @param {string} fromDate - Dátum od (YYYY-MM-DD).
- * @param {string} toDate - Dátum do (YYYY-MM-DD).
- * @param {string[]} fileList - Zoznam súborov na kontrolu.
- * @returns {Promise<Object[]>} - Pole odfiltrovaných dátových záznamov.
- */
 export async function loadDataForRange(fromDate, toDate, fileList) {
     const fromMonth = fromDate.substring(0, 7);
     const toMonth = toDate.substring(0, 7);
@@ -69,9 +62,8 @@ export async function loadDataForRange(fromDate, toDate, fileList) {
         }
     }
 
-    // Odfiltrovanie presného rozsahu
     const fromTimestamp = new Date(fromDate).getTime();
-    const toTimestamp = new Date(toDate).getTime() + (24 * 60 * 60 * 1000 - 1); // Koniec dňa
+    const toTimestamp = new Date(toDate).getTime() + (24 * 60 * 60 * 1000 - 1);
 
     return allData.filter(item => item.t >= fromTimestamp && item.t <= toTimestamp);
 }
