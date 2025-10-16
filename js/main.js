@@ -28,9 +28,36 @@ document.addEventListener('DOMContentLoaded', () => {
     function displaySummaryData(summary, mode) { /* ... (bez zmeny) ... */ if(!summary){dashboard.style.display="none";return}const timeFormatter=ts=>ts?`(${'day'===mode?formatTimestampToLocalTime(ts):formatTimestampToDayMonth(ts)})`:"",updateText=(id,value,unit="",decimals=1,time=null)=>{const valueEl=document.getElementById(id),timeEl=document.getElementById(`${id}-time`);valueEl&&(valueEl.textContent=null!==value?` ${value.toFixed(decimals)} ${unit}`:" -"),timeEl&&(timeEl.textContent=timeFormatter(time))};updateText("summary-temp-max",summary.tempMax,"°C",1,summary.tempMaxTime),updateText("summary-temp-avg",summary.tempAvg,"°C"),updateText("summary-temp-min",summary.tempMin,"°C",1,summary.tempMinTime),updateText("summary-hum-max",summary.humMax,"%",0,summary.humMaxTime),updateText("summary-hum-avg",summary.humAvg,"%",0),updateText("summary-hum-min",summary.humMin,"%",0,summary.humMinTime),updateText("summary-press-max",summary.pressMax,"hPa",1,summary.pressMaxTime),updateText("summary-press-avg",summary.pressAvg,"hPa"),updateText("summary-press-min",summary.pressMin,"hPa",1,summary.pressMinTime),updateText("summary-solar-max",summary.srMax,"W/m²",0,summary.srMaxTime),updateText("summary-solar-avg",summary.srAvg,"W/m²",0),updateText("summary-uv-max",summary.uvMax,"",1,summary.uvMaxTime),updateText("summary-uv-avg",summary.uvAvg,"",1),updateText("summary-wind-speed-max",summary.wsMax,"m/s",1,summary.wsMaxTime),updateText("summary-wind-speed-avg",summary.wsAvg,"m/s"),document.getElementById("summary-wind-dir").textContent=degToCard(summary.wdMode),updateText("summary-wind-gust-max",summary.wgMax,"m/s",1,summary.wgMaxTime),updateText("summary-wind-gust-min",summary.wgMin,"m/s",1,summary.wgMinTime),document.getElementById("summary-rain-max-daily").textContent=null!==summary.rainTotal?`${summary.rainTotal.toFixed(1)} mm`:"-",document.getElementById("summary-rain-sum").textContent=null!==summary.rainSumOfTotals?`${summary.rainSumOfTotals.toFixed(1)} mm`:"-",dashboard.style.display="grid"}
     function displayDataInTable(data, mode) { /* ... (bez zmeny) ... */ let tableHTML='<table><thead><tr>';const headers='hourly'===mode?["Čas","Teplota (°C)","Vlhkosť (%)","Tlak (hPa)","Rýchl. Vetra (m/s)","Nárazy Vetra (m/s)","Smer Vetra","Zrážky (mm)","Priem. Solárne (W/m²)","Priem. UV"]:["Deň","Priem. Teplota (°C)","Priem. Vlhkosť (%)","Priem. Tlak (hPa)","Priem. Rýchl. (m/s)","Max. Náraz (m/s)","Smer Vetra","Zrážky (mm)","Max. Solárne (W/m²)","Max. UV"];tableHTML+=headers.map(h=>`<th>${h}</th>`).join(""),tableHTML+="</tr></thead><tbody>",data.forEach(item=>{const windDirText=degToCard("hourly"===mode?item.wd:item.wdMode),f=(val,dec=1)=>null!==val?val.toFixed(dec):"-";"hourly"===mode?tableHTML+=`<tr><td>${item.time}</td><td>${f(item.temp)}</td><td>${f(item.hum,0)}</td><td>${f(item.press)}</td><td>${f(item.ws)}</td><td>${f(item.wg)}</td><td style="text-align:center;">${windDirText}</td><td>${f(item.rain)}</td><td>${f(item.sr,0)}</td><td>${f(item.uv)}</td></tr>`:tableHTML+=`<tr><td>${item.day}</td><td>${f(item.tempAvg)}</td><td>${f(item.humAvg,0)}</td><td>${f(item.pressAvg)}</td><td>${f(item.wsAvg)}</td><td>${f(item.wgMax)}</td><td style="text-align:center;">${windDirText}</td><td>${f(item.rainTotal)}</td><td>${f(item.srMax,0)}</td><td>${f(item.uvMax)}</td></tr>`}),tableHTML+="</tbody></table>",jsonOutput.innerHTML=tableHTML}
     
+    // =======================================================
+    // ZMENA: Funkcia teraz správne zachováva hodnotu dátumu
+    // =======================================================
     function updateDateInputType(minDate = null, maxDate = null) {
-        // ... (Táto funkcia zostáva bez zmeny)
-        const mode=viewMode.value,currentDateValue=dateInput.value;let[year,month,day]=currentDateValue.split("-");"day"===mode?(dateInput.type="date",minDate&&maxDate&&(dateInput.min=minDate,dateInput.max=maxDate),day||(dateInput.value=`${year}-${month}-01`)):(dateInput.type="month",minDate&&maxDate&&(dateInput.min=minDate.substring(0,7),dateInput.max=maxDate.substring(0,7)))}
+        const mode = viewMode.value;
+        const currentDateValue = dateInput.value;
+        // Získame rok, mesiac a deň. Deň môže byť nedefinovaný.
+        let [year, month, day] = currentDateValue.split('-');
+
+        if (mode === 'day') {
+            dateInput.type = 'date';
+            // Nastavíme min/max atribúty pre denný výber
+            if (minDate && maxDate) {
+                dateInput.min = minDate;
+                dateInput.max = maxDate;
+            }
+            // Ak prepíname z mesačného pohľadu (kde 'day' chýba), nastavíme na prvý deň.
+            // Inak ponecháme existujúci deň.
+            dateInput.value = `${year}-${month}-${day || '01'}`;
+        } else { // mode === 'month'
+            dateInput.type = 'month';
+            // Nastavíme min/max atribúty pre mesačný výber
+            if (minDate && maxDate) {
+                dateInput.min = minDate.substring(0, 7);
+                dateInput.max = maxDate.substring(0, 7);
+            }
+            // Vždy explicitne nastavíme hodnotu na YYYY-MM, čím odstránime deň
+            dateInput.value = `${year}-${month}`;
+        }
+    }
     
     async function init() {
         availableFiles = await fetchAvailableFiles();
@@ -39,17 +66,12 @@ document.addEventListener('DOMContentLoaded', () => {
         
         const { min, max } = await getAvailableDateRange(availableFiles);
 
-        // =======================================================
-        // ZMENA: Nastavenie predvolenej hodnoty na predchádzajúci mesiac
-        // =======================================================
         const today = new Date();
-        today.setMonth(today.getMonth() - 1); // Posunieme sa na predchádzajúci mesiac
+        today.setMonth(today.getMonth() - 1);
         const year = today.getFullYear();
         const month = String(today.getMonth() + 1).padStart(2, '0');
         
-        // Nastavíme hodnotu inputu
         dateInput.value = `${year}-${month}`;
-        // =======================================================
         
         updateDateInputType(min, max);
         
