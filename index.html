@@ -37,12 +37,17 @@
     </p>
 
     <h2>Nastavenia Zobrazenia</h2>
+    
+    <div id="data-availability" class="data-availability-info">
+        <p>Načítavam informácie o dostupných dátach...</p>
+    </div>
+
     <div class="control-panel">
         <div><label for="viewMode">Režim zobrazenia</label><select id="viewMode"><option value="month">Mesačný prehľad</option><option value="day">Denný prehľad</option></select></div>
         <div><label for="dateInput">Vybrať Obdobie</label><input type="month" id="dateInput" value="2025-09"></div>
         <div style="display: flex; align-items: flex-end;"><button id="loadDataButton">Zobraziť Dáta</button></div>
     </div>
-
+    
     <div class="output-section">
         <h2>Výsledok agregácie pre obdobie: <span id="selected-period">--</span></h2>
         
@@ -62,7 +67,6 @@
 </main>
 
 <script>
-    // Skript pre tému a hamburger menu
     function toggleTheme(){const e=document.getElementById("body-main"),t=document.getElementById("themeToggle"),o=e.classList.toggle("dark-mode");localStorage.setItem("theme",o?"dark":"light"),t.innerHTML=o?"🌙 Prepni na Svetlý Motív":"☀️ Prepni na Tmavý Motív"}document.addEventListener("DOMContentLoaded",()=>{const e=localStorage.getItem("theme");"dark"===e&&(document.getElementById("body-main").classList.add("dark-mode"),document.getElementById("themeToggle").innerHTML="🌙 Prepni na Svetlý Motív");const t=document.querySelector(".hamburger"),o=document.querySelector(".nav-menu");t.addEventListener("click",()=>{t.classList.toggle("active"),o.classList.toggle("active")})});
 </script>
 
