@@ -1,10 +1,9 @@
 // js/analysis.js
-import { getAvailableDateRange, loadDataForRange } from './data-loader.js';
+import { fetchAvailableFiles, getAvailableDateRange, loadDataForRange } from './data-loader.js';
 import { aggregateCustomRange } from './custom-aggregation.js';
 import { renderChart } from './chart-renderer.js';
-import { formatTimestampToLocalDate } from './utils.js';
+import { formatTimestampToLocalDate, generateAvailableDataString } from './utils.js';
 
-// Konfigurácia premenných pre dynamický výber a graf
 const VARIABLES = {
     temp: { label: 'Teplota (°C)', unit: '°C', color: '#007bff', yAxisID: 'y' },
     hum: { label: 'Vlhkosť (%)', unit: '%', color: '#17a2b8', yAxisID: 'y1' },
@@ -24,24 +23,20 @@ document.addEventListener('DOMContentLoaded', async () => {
     const placeholder = document.getElementById('placeholder-analysis');
     const summaryContainer = document.getElementById('analysis-summary');
     const variableNameSpan = document.getElementById('variable-name');
-    const availableFiles = ['2025_08.json', '2025_09.json'];
+    // ZMENA: Nový cieľový element
+    const availabilityInfo = document.getElementById('data-availability-analysis');
+    
+    let availableFiles = [];
 
     function populateSecondVariableSelect() {
         const selectedVar1 = variableSelect1.value;
-        const selectedConfig1 = VARIABLES[selectedVar1];
-        
-        // Vymažeme staré možnosti
         variableSelect2.innerHTML = '';
-        
-        // Pridáme možnosť "Žiadna"
         const noneOption = document.createElement('option');
         noneOption.value = 'none';
         noneOption.textContent = 'Žiadna';
         variableSelect2.appendChild(noneOption);
-
-        // Pridáme len kompatibilné možnosti
         for (const [key, config] of Object.entries(VARIABLES)) {
-            if (key !== selectedVar1) { // Nezobrazíme tú istú premennú
+            if (key !== selectedVar1) {
                 const option = document.createElement('option');
                 option.value = key;
                 option.textContent = config.label;
@@ -51,13 +46,25 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     async function init() {
+        availableFiles = await fetchAvailableFiles();
+        
+        // ZMENA: Aktualizujeme nový element namiesto placeholderu
+        const availableDataText = generateAvailableDataString(availableFiles);
+        if (availabilityInfo) {
+            availabilityInfo.innerHTML = `<p>Dostupné dáta: ${availableDataText}</p>`;
+        }
+
         const { min, max } = await getAvailableDateRange(availableFiles);
         if (min && max) {
             dateFromInput.min = min; dateFromInput.max = max;
             dateToInput.min = min; dateToInput.max = max;
             dateFromInput.value = min; dateToInput.value = max;
+        } else {
+            analyzeButton.disabled = true;
+            placeholder.innerHTML = `<p>Neboli nájdené žiadne dátové súbory. Skontrolujte súbor manifest.json.</p>`;
         }
-        populateSecondVariableSelect(); // Naplníme druhý select pri štarte
+
+        populateSecondVariableSelect();
         analyzeButton.addEventListener('click', handleAnalysis);
         variableSelect1.addEventListener('change', populateSecondVariableSelect);
     }
@@ -70,6 +77,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         
         if (!from || !to || from > to) { alert('Zvoľte platný rozsah dátumov.'); return; }
 
+        placeholder.style.display = 'block';
         placeholder.innerHTML = '<p>Analyzujem dáta...</p>';
         outputSection.style.display = 'none';
 
@@ -107,19 +115,9 @@ document.addEventListener('DOMContentLoaded', async () => {
             const t = (ts) => (ts ? `(${formatTimestampToLocalDate(ts)})` : '');
 
             if (variable === 'rain') {
-                html += `
-                <div class="summary-box"><h4>Štatistiky Zrážok</h4><div class="data-points">
-                    <div class="data-point"><span>Celkový úhrn</span><span class="value">${f(summary.total, 1)} mm</span></div>
-                    <div class="data-point"><span>Najvyšší denný úhrn</span><span class="value">${f(summary.max, 1)} mm</span><span class="timestamp">${t(summary.maxTime)}</span></div>
-                    <div class="data-point"><span>Priemerný denný úhrn</span><span class="value">${f(summary.avg, 1)} mm</span></div>
-                </div></div>`;
+                html += `<div class="summary-box"><h4>Štatistiky Zrážok</h4><div class="data-points"><div class="data-point"><span>Celkový úhrn</span><span class="value">${f(summary.total, 1)} mm</span></div><div class="data-point"><span>Najvyšší denný úhrn</span><span class="value">${f(summary.max, 1)} mm</span><span class="timestamp">${t(summary.maxTime)}</span></div><div class="data-point"><span>Priemerný denný úhrn</span><span class="value">${f(summary.avg, 1)} mm</span></div></div></div>`;
             } else {
-                 html += `
-                 <div class="summary-box"><h4>Štatistiky (${config.label})</h4><div class="data-points">
-                    <div class="data-point"><span>Maximum</span><span class="value">${f(summary.max)} ${config.unit}</span><span class="timestamp">${t(summary.maxTime)}</span></div>
-                    <div class="data-point"><span>Priemer</span><span class="value">${f(summary.avg)} ${config.unit}</span></div>
-                    <div class="data-point"><span>Minimum</span><span class="value">${f(summary.min)} ${config.unit}</span><span class="timestamp">${t(summary.minTime)}</span></div>
-                </div></div>`;
+                 html += `<div class="summary-box"><h4>Štatistiky (${config.label})</h4><div class="data-points"><div class="data-point"><span>Maximum</span><span class="value">${f(summary.max)} ${config.unit}</span><span class="timestamp">${t(summary.maxTime)}</span></div><div class="data-point"><span>Priemer</span><span class="value">${f(summary.avg)} ${config.unit}</span></div><div class="data-point"><span>Minimum</span><span class="value">${f(summary.min)} ${config.unit}</span><span class="timestamp">${t(summary.minTime)}</span></div></div></div>`;
             }
         });
         summaryContainer.innerHTML = html;
