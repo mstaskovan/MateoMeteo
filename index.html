@@ -31,20 +31,19 @@
 
 <main>
     <div class="container">
-    <h1>MESAČNÝ A DENNÝ PREHĽAD</h1>
+    <h1>Mesačný a Denný Prehľad</h1>
     
-    <h2>NASTAVENIE ZOBRAZENIA</h2>
-    
-    </div>
-    <div class="container">
+    <h2>Nastavenia Zobrazenia</h2>
+    <div id="data-availability" class="data-availability-info">
         <p>Načítavam informácie o dostupných dátach...</p>
     </div>
+        
     <div class="control-panel">
         <div><label for="viewMode">Režim Zobrazenia</label><select id="viewMode"><option value="month">Mesačný prehľad</option><option value="day">Denný prehľad</option></select></div>
         <div><label for="dateInput">Vybrať Obdobie</label><input type="month" id="dateInput" value="2025-09"></div>
         <div style="display: flex; align-items: flex-end;"><button id="loadDataButton">Zobraziť Dáta</button></div>
     </div>
-    <div id="placeholder-analysis" class="placeholder-data">
+    <div>
         <p>Zvoľte režim zobrazenia, vyberte obdobie a kliknite na "Zobraziť Dáta".</p>
     </div>
     
@@ -74,6 +73,7 @@
 
 </body>
 </html>
+
 
 
 
