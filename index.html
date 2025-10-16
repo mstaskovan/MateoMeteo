@@ -17,23 +17,23 @@
             <li class="nav-item"><a href="analysis.html" class="nav-link">Analýza histórie</a></li>
             <li class="nav-item"><a href="https://app.weathercloud.net/d8786709109#profile" target="_blank" class="nav-link">Aktuálne na Weathercloud</a></li>
         </ul>
-        <div class="hamburger">
-            <span class="bar"></span><span class="bar"></span><span class="bar"></span>
+        
+        <div class="nav-controls">
+            <button id="themeToggle" class="theme-toggle" onclick="toggleTheme()">
+                <span id="themeIcon">☀️</span>
+            </button>
+            <div class="hamburger">
+                <span class="bar"></span><span class="bar"></span><span class="bar"></span>
+            </div>
         </div>
     </div>
 </nav>
 
 <main>
 <div class="container">
-    <div class="theme-toggle-wrapper">
-        <button id="themeToggle" class="theme-toggle" onclick="toggleTheme()">
-            <span id="themeIcon">☀️</span> Prepni na Tmavý Motív
-        </button>
-    </div>
-
-    <h1>MESAČNÝ A DENNÝ PREHĽAD</h1>
+    <h1>Mesačný a Denný Prehľad</h1>
     
-    <h2>NASTAVENIE ZOBRAZENIA</h2>
+    <h2>Nastavenia Zobrazenia</h2>
     <div id="data-availability" class="data-availability-info">
         <p>Načítavam informácie o dostupných dátach...</p>
     </div>
@@ -53,8 +53,8 @@
             <div class="summary-box"><h4>Tlak</h4><div class="data-points"><div class="data-point data-point-max"><span>Maximum</span><span class="value" id="summary-press-max"> - hPa</span><span class="timestamp" id="summary-press-max-time"></span></div><div class="data-point data-point-avg"><span>Priemer</span><span class="value" id="summary-press-avg"> - hPa</span></div><div class="data-point data-point-min"><span>Minimum</span><span class="value" id="summary-press-min"> - hPa</span><span class="timestamp" id="summary-press-min-time"></span></div></div></div>
             <div class="summary-box"><h4>Rýchlosť Vetra</h4><div class="data-points"><div class="data-point data-point-max"><span>Maximum</span><span class="value" id="summary-wind-speed-max"> - m/s</span><span class="timestamp" id="summary-wind-speed-max-time"></span></div><div class="data-point data-point-avg"><span>Priemer</span><span class="value" id="summary-wind-speed-avg"> - m/s</span></div><div class="data-point"><span>Smer</span><span class="value" id="summary-wind-dir">-</span></div></div></div>
             <div class="summary-box"><h4>Nárazy Vetra</h4><div class="data-points"><div class="data-point data-point-max"><span>Maximum</span><span class="value" id="summary-wind-gust-max"> - m/s</span><span class="timestamp" id="summary-wind-gust-max-time"></span></div><div class="data-point data-point-min"><span>Minimum > 0</span><span class="value" id="summary-wind-gust-min"> - m/s</span><span class="timestamp" id="summary-wind-gust-min-time"></span></div></div></div>
-            <div class="summary-box"><h4>Zrážky</h4><div class="data-points"><div class="data-point data-point-max"><span>Maximálný úhrn</span><span class="value" id="summary-rain-max-daily">- mm</span></div><div class="data-point"><span>Celkový súčet</span><span class="value" id="summary-rain-sum">- mm</span></div></div></div>
-            <div class="summary-box"><h4>Žiarenie</h4><div class="data-points"><div class="data-point data-point-max"><span>Maximum</span><span class="value" id="summary-solar-max"> - W/m²</span><span class="timestamp" id="summary-solar-max-time"></span></div><div class="data-point data-point-avg"><span>Priemer</span><span class="value" id="summary-solar-avg">- W/m²</span></div><div class="data-point data-point-max"><span>Maximum UV Index</span><span class="value" id="summary-uv-max">-</span><span class="timestamp" id="summary-uv-max-time"></span></div><div class="data-point data-point-avg"><span>Priemer UV</span><span class="value" id="summary-uv-avg">-</span></div></div></div>
+            <div class="summary-box"><h4>Zrážky</h4><div class="data-points"><div class="data-point data-point-max"><span>Max. denný úhrn</span><span class="value" id="summary-rain-max-daily">- mm</span></div><div class="data-point"><span>Celkový súčet</span><span class="value" id="summary-rain-sum">- mm</span></div></div></div>
+            <div class="summary-box"><h4>Žiarenie</h4><div class="data-points"><div class="data-point data-point-max"><span>Maximum</span><span class="value" id="summary-solar-max"> - W/m²</span><span class="timestamp" id="summary-solar-max-time"></span></div><div class="data-point data-point-avg"><span>Priemer</span><span class="value" id="summary-solar-avg">- W/m²</span></div><div class="data-point data-point-max"><span>Max. UV Index</span><span class="value" id="summary-uv-max">-</span><span class="timestamp" id="summary-uv-max-time"></span></div><div class="data-point data-point-avg"><span>Priemer. UV</span><span class="value" id="summary-uv-avg">-</span></div></div></div>
         </div>
         
         <div class="responsive-table"><div id="json-data" class="placeholder-data"><p>Vyberte obdobie a kliknite na "Zobraziť Dáta".</p></div></div>
@@ -63,33 +63,10 @@
 </main>
 
 <script>
-    function toggleTheme(){const e=document.getElementById("body-main"),t=document.getElementById("themeToggle"),o=e.classList.toggle("dark-mode");localStorage.setItem("theme",o?"dark":"light"),t.innerHTML=o?"🌙 Prepni na Svetlý Motív":"☀️ Prepni na Tmavý Motív"}
-    
-    document.addEventListener("DOMContentLoaded",()=>{
-        // Načítanie témy
-        const e=localStorage.getItem("theme");"dark"===e&&(document.getElementById("body-main").classList.add("dark-mode"),document.getElementById("themeToggle").innerHTML="🌙 Prepni na Svetlý Motív");
-        
-        // Logika pre hamburger menu
-        const t=document.querySelector(".hamburger"),o=document.querySelector(".nav-menu");t.addEventListener("click",()=>{t.classList.toggle("active"),o.classList.toggle("active")});
-
-        // =======================================================
-        // NOVÁ LOGIKA PRE AKTÍVNE MENU
-        // =======================================================
-        const navLinks = document.querySelectorAll('.nav-link');
-        let currentPage = window.location.pathname.split('/').pop();
-        if (currentPage === '') currentPage = 'index.html'; // Pre prípad, že adresa končí len "/"
-
-        navLinks.forEach(link => {
-            if (link.getAttribute('href') === currentPage) {
-                link.classList.add('active');
-            }
-        });
-        // =======================================================
-    });
+    function toggleTheme(){const e=document.getElementById("body-main"),t=document.getElementById("themeToggle"),o=e.classList.toggle("dark-mode");localStorage.setItem("theme",o?"dark":"light"),t.querySelector('#themeIcon').innerHTML=o?"🌙":"☀️"}document.addEventListener("DOMContentLoaded",()=>{const e=localStorage.getItem("theme");"dark"===e&&(document.getElementById("body-main").classList.add("dark-mode"),document.getElementById("themeToggle").querySelector('#themeIcon').innerHTML="🌙");const t=document.querySelector(".hamburger"),o=document.querySelector(".nav-menu");t.addEventListener("click",()=>{t.classList.toggle("active"),o.classList.toggle("active")});const n=document.querySelectorAll(".nav-link");let d=window.location.pathname.split("/").pop();""===d&&(d="index.html"),n.forEach(e=>{e.getAttribute("href")===d&&e.classList.add("active")})});
 </script>
 
 <script type="module" src="js/main.js"></script>
 
 </body>
 </html>
-
