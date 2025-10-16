@@ -23,7 +23,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     const placeholder = document.getElementById('placeholder-analysis');
     const summaryContainer = document.getElementById('analysis-summary');
     const variableNameSpan = document.getElementById('variable-name');
-    // ZMENA: Nový cieľový element
     const availabilityInfo = document.getElementById('data-availability-analysis');
     
     let availableFiles = [];
@@ -48,7 +47,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     async function init() {
         availableFiles = await fetchAvailableFiles();
         
-        // ZMENA: Aktualizujeme nový element namiesto placeholderu
         const availableDataText = generateAvailableDataString(availableFiles);
         if (availabilityInfo) {
             availabilityInfo.innerHTML = `<p>Dostupné dáta: ${availableDataText}</p>`;
@@ -115,9 +113,19 @@ document.addEventListener('DOMContentLoaded', async () => {
             const t = (ts) => (ts ? `(${formatTimestampToLocalDate(ts)})` : '');
 
             if (variable === 'rain') {
-                html += `<div class="summary-box"><h4>Štatistiky Zrážok</h4><div class="data-points"><div class="data-point"><span>Celkový úhrn</span><span class="value">${f(summary.total, 1)} mm</span></div><div class="data-point"><span>Najvyšší denný úhrn</span><span class="value">${f(summary.max, 1)} mm</span><span class="timestamp">${t(summary.maxTime)}</span></div><div class="data-point"><span>Priemerný denný úhrn</span><span class="value">${f(summary.avg, 1)} mm</span></div></div></div>`;
+                html += `
+                <div class="summary-box"><h4>Štatistiky Zrážok</h4><div class="data-points">
+                    <div class="data-point data-point-avg"><span>Celkový úhrn</span><span class="value">${f(summary.total, 1)} mm</span></div>
+                    <div class="data-point data-point-max"><span>Najvyšší denný úhrn</span><span class="value">${f(summary.max, 1)} mm</span><span class="timestamp">${t(summary.maxTime)}</span></div>
+                    <div class="data-point data-point-avg"><span>Priemerný denný úhrn</span><span class="value">${f(summary.avg, 1)} mm</span></div>
+                </div></div>`;
             } else {
-                 html += `<div class="summary-box"><h4>Štatistiky (${config.label})</h4><div class="data-points"><div class="data-point"><span>Maximum</span><span class="value">${f(summary.max)} ${config.unit}</span><span class="timestamp">${t(summary.maxTime)}</span></div><div class="data-point"><span>Priemer</span><span class="value">${f(summary.avg)} ${config.unit}</span></div><div class="data-point"><span>Minimum</span><span class="value">${f(summary.min)} ${config.unit}</span><span class="timestamp">${t(summary.minTime)}</span></div></div></div>`;
+                 html += `
+                 <div class="summary-box"><h4>Štatistiky (${config.label})</h4><div class="data-points">
+                    <div class="data-point data-point-max"><span>Maximum</span><span class="value">${f(summary.max)} ${config.unit}</span><span class="timestamp">${t(summary.maxTime)}</span></div>
+                    <div class="data-point data-point-avg"><span>Priemer</span><span class="value">${f(summary.avg)} ${config.unit}</span></div>
+                    <div class="data-point data-point-min"><span>Minimum</span><span class="value">${f(summary.min)} ${config.unit}</span><span class="timestamp">${t(summary.minTime)}</span></div>
+                </div></div>`;
             }
         });
         summaryContainer.innerHTML = html;
