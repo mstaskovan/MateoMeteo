@@ -38,7 +38,7 @@
     /* NOVÉ: Svetlejšie odtiene pre tmavý režim */
     --max-color: #f87171; /* Svetlejšia červená */
     --avg-color: #4ade80; /* Svetlejšia zelená */
-    --min-color: #facc15; /* Jasnejšia žltá */
+    --min-color: #9e3bc7; /* Fialová */
 
     .control-panel input::-webkit-calendar-picker-indicator { filter: invert(1) brightness(0.8); }
 }
@@ -155,4 +155,5 @@ h1, h2 { color: var(--heading-color); text-align: center; }
     .hamburger.active .bar:nth-child(3) { transform: translateY(-8px) rotate(-45deg); }
     .control-panel, .control-panel.analysis-panel { grid-template-columns: 1fr; }
 }
+
 
