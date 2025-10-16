@@ -21,11 +21,11 @@
 .navbar { background-color: var(--container-bg); box-shadow: 0 2px 4px var(--shadow-color); padding: 0 1.5rem; position: sticky; top: 0; z-index: 1000; }
 .nav-container { display: flex; justify-content: space-between; align-items: center; height: 70px; max-width: 1200px; margin: 0 auto; }
 .nav-logo { color: var(--heading-color); font-size: 1.6rem; font-weight: 700; text-decoration: none; }
-.nav-menu { display: flex; list-style: none; margin: 0; padding: 0; margin-left: auto; /* KĽÚČOVÁ ZMENA pre desktop */ }
+.nav-menu { display: flex; list-style: none; margin: 0; padding: 0; margin-left: auto; margin-right: 1rem; }
 .nav-item { margin-left: 2rem; }
 .nav-link { color: var(--text-color); text-decoration: none; font-size: 1.1rem; transition: color 0.3s; }
 .nav-link:hover, .nav-link.active { color: var(--heading-color); font-weight: 700; }
-.nav-controls { display: flex; align-items: center; gap: 0.5rem; /* Zmenšená medzera */ }
+.nav-controls { display: flex; align-items: center; gap: 0.5rem; }
 .hamburger { display: none; cursor: pointer; }
 .bar { display: block; width: 25px; height: 3px; margin: 5px auto; transition: all 0.3s ease-in-out; background-color: var(--text-color); }
 main { padding-top: 20px; }
@@ -102,3 +102,4 @@ h1, h2 { color: var(--heading-color); text-align: center; }
     .hamburger.active .bar:nth-child(3) { transform: translateY(-8px) rotate(-45deg); }
     .control-panel, .control-panel.analysis-panel { grid-template-columns: 1fr; }
 }
+
