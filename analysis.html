@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="sk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Detailná Analýza | Meteostanica</title>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body id="body-main">
+
+<nav class="navbar">
+    <div class="nav-container">
+        <a href="index.html" class="nav-logo">Meteo Stanica</a>
+        <ul class="nav-menu">
+            <li class="nav-item"><a href="index.html" class="nav-link">Hlavný Prehľad</a></li>
+            <li class="nav-item"><a href="analysis.html" class="nav-link active">Detailná Analýza</a></li>
+            <li class="nav-item"><a href="https://app.weathercloud.net/d0496387375#profile" target="_blank" class="nav-link">Aktuálne Dáta</a></li>
+        </ul>
+        <div class="hamburger"><span class="bar"></span><span class="bar"></span><span class="bar"></span></div>
+    </div>
+</nav>
+
+<main>
+<div class="container">
+    <div class="theme-toggle-wrapper">
+        <button id="themeToggle" class="theme-toggle" onclick="toggleTheme()">
+            <span id="themeIcon">☀️</span> Prepni na Tmavý Motív
+        </button>
+    </div>
+
+    <h1>Detailná Analýza Dát</h1>
+    <p class="intro">
+        Zvoľte si jednu alebo dve premenné a časový rozsah pre zobrazenie detailných štatistík a grafu.
+    </p>
+
+    <h2>Nastavenia Analýzy</h2>
+    <div class="control-panel analysis-panel">
+        <div>
+            <label for="variableSelect1">1. Premenná (ľavá os)</label>
+            <select id="variableSelect1">
+                <option value="temp">Teplota (°C)</option>
+                <option value="hum">Vlhkosť (%)</option>
+                <option value="press">Tlak (hPa)</option>
+                <option value="rain">Zrážky (mm)</option>
+                <option value="ws">Rýchlosť vetra (m/s)</option>
+                <option value="wg">Nárazy vetra (m/s)</option>
+            </select>
+        </div>
+        <div>
+            <label for="variableSelect2">2. Premenná (pravá os)</label>
+            <select id="variableSelect2">
+                </select>
+        </div>
+        <div>
+            <label for="dateFrom">Dátum od</label>
+            <input type="date" id="dateFrom">
+        </div>
+        <div>
+            <label for="dateTo">Dátum do</label>
+            <input type="date" id="dateTo">
+        </div>
+        <div style="display: flex; align-items: flex-end;">
+            <button id="analyzeButton">Analyzovať Obdobie</button>
+        </div>
+    </div>
+
+    <div id="analysis-output" class="output-section" style="display: none;">
+        <h2>Výsledky analýzy pre <span id="variable-name"></span></h2>
+        <div id="analysis-summary" class="summary-dashboard"></div>
+        <div class="chart-container">
+            <canvas id="analysisChart"></canvas>
+        </div>
+    </div>
+
+    <div id="placeholder-analysis" class="placeholder-data">
+        <p>Zvoľte premennú a rozsah dátumov a kliknite na "Analyzovať Obdobie".<br><small>Dostupné sú dáta len pre mesiace, ku ktorým existuje JSON súbor.</small></p>
+    </div>
+</div>
+</main>
+
+<script>
+    function toggleTheme(){const e=document.getElementById("body-main"),t=document.getElementById("themeToggle"),o=e.classList.toggle("dark-mode");localStorage.setItem("theme",o?"dark":"light"),t.innerHTML=o?"🌙 Prepni na Svetlý Motív":"☀️ Prepni na Tmavý Motív"}document.addEventListener("DOMContentLoaded",()=>{const e=localStorage.getItem("theme");"dark"===e&&(document.getElementById("body-main").classList.add("dark-mode"),document.getElementById("themeToggle").innerHTML="🌙 Prepni na Svetlý Motív");const t=document.querySelector(".hamburger"),o=document.querySelector(".nav-menu");t.addEventListener("click",()=>{t.classList.toggle("active"),o.classList.toggle("active")})});
+</script>
+<script type="module" src="js/analysis.js"></script>
+
+</body>
+</html>
