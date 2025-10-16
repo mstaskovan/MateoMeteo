@@ -18,16 +18,14 @@
 /* ======================================================= */
 /* 2. NAVIGAČNÉ MENU */
 /* ======================================================= */
-.navbar { background-color: var(--container-bg); box-shadow: 0 2px 4px var(--shadow-color); padding: 0 2rem; position: sticky; top: 0; z-index: 1000; }
+.navbar { background-color: var(--container-bg); box-shadow: 0 2px 4px var(--shadow-color); padding: 0 1.5rem; position: sticky; top: 0; z-index: 1000; }
 .nav-container { display: flex; justify-content: space-between; align-items: center; height: 70px; max-width: 1200px; margin: 0 auto; }
-.nav-logo { color: var(--heading-color); font-size: 1.8rem; font-weight: 700; text-decoration: none; }
-.nav-menu { display: flex; list-style: none; margin: 0; padding: 0; }
+.nav-logo { color: var(--heading-color); font-size: 1.6rem; font-weight: 700; text-decoration: none; }
+.nav-menu { display: flex; list-style: none; margin: 0; padding: 0; margin-left: auto; /* KĽÚČOVÁ ZMENA pre desktop */ }
 .nav-item { margin-left: 2rem; }
 .nav-link { color: var(--text-color); text-decoration: none; font-size: 1.1rem; transition: color 0.3s; }
 .nav-link:hover, .nav-link.active { color: var(--heading-color); font-weight: 700; }
-
-/* NOVÉ: Kontajner pre ovládacie prvky v menu (tlačidlo témy a hamburger) */
-.nav-controls { display: flex; align-items: center; gap: 1rem; }
+.nav-controls { display: flex; align-items: center; gap: 0.5rem; /* Zmenšená medzera */ }
 .hamburger { display: none; cursor: pointer; }
 .bar { display: block; width: 25px; height: 3px; margin: 5px auto; transition: all 0.3s ease-in-out; background-color: var(--text-color); }
 main { padding-top: 20px; }
@@ -39,12 +37,10 @@ body { font-family: 'Roboto', sans-serif; background-color: var(--bg-color); col
 .container { max-width: 1200px; margin: 20px auto; padding: 20px; background-color: var(--container-bg); box-shadow: 0 4px 12px var(--shadow-color); border-radius: 8px; }
 h1, h2 { color: var(--heading-color); text-align: center; }
 .intro { text-align: center; margin-bottom: 20px; color: var(--text-color); opacity: 0.8; font-size: 1.1em; padding-bottom: 15px; border-bottom: 1px solid var(--box-border); }
-
-/* ZMENA: Tlačidlo témy je teraz v navbare */
 .theme-toggle {
-    cursor: pointer; padding: 8px 12px; border-radius: 50%; /* Okrúhle tlačidlo */
-    background-color: transparent; color: var(--text-color); border: 1px solid transparent;
-    font-size: 1.2rem; line-height: 1; transition: background-color 0.3s, border-color 0.3s;
+    cursor: pointer; padding: 8px 12px; border-radius: 50%; background-color: transparent;
+    border: 1px solid transparent; font-size: 1.2rem; line-height: 1; 
+    transition: background-color 0.3s, border-color 0.3s; color: var(--text-color);
 }
 .theme-toggle:hover { background-color: var(--control-panel-bg); border-color: var(--box-border); }
 
@@ -64,10 +60,7 @@ h1, h2 { color: var(--heading-color); text-align: center; }
 /* ======================================================= */
 .output-section h2 { margin-top: 30px; margin-bottom: 10px; }
 .output-section table { width: 100%; border-collapse: collapse; }
-.output-section th, .output-section td {
-    padding: 12px 8px; text-align: center; font-size: 0.9em;
-    border: none; border-bottom: 1px solid var(--box-border); color: var(--text-color);
-}
+.output-section th, .output-section td { padding: 12px 8px; text-align: center; font-size: 0.9em; border: none; border-bottom: 1px solid var(--box-border); color: var(--text-color); }
 .dark-mode .output-section th, .dark-mode .output-section td { color: white; }
 .output-section th { background-color: var(--box-bg); font-weight: 700; border-bottom-width: 2px; border-bottom-color: var(--heading-color); }
 .output-section tr:hover td { background-color: var(--hover-color); }
@@ -100,7 +93,7 @@ h1, h2 { color: var(--heading-color); text-align: center; }
     .control-panel.analysis-panel { grid-template-columns: 1fr 1fr; }
 }
 @media (max-width: 768px) {
-    .nav-menu { position: fixed; left: -100%; top: 70px; flex-direction: column; background-color: var(--container-bg); width: 100%; text-align: center; transition: 0.3s; box-shadow: 0 4px 8px var(--shadow-color); }
+    .nav-menu { position: fixed; left: -100%; top: 70px; flex-direction: column; background-color: var(--container-bg); width: 100%; text-align: center; transition: 0.3s; box-shadow: 0 4px 8px var(--shadow-color); margin-left: 0; }
     .nav-menu.active { left: 0; }
     .nav-item { margin: 1.5rem 0; }
     .hamburger { display: block; }
