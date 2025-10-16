@@ -115,7 +115,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (variable === 'rain') {
                 html += `
                 <div class="summary-box"><h4>Štatistiky Zrážok</h4><div class="data-points">
-                    <div class="data-point data-point-avg"><span>Celkový úhrn</span><span class="value">${f(summary.total, 1)} mm</span></div>
+                    <div class="data-point"><span>Celkový úhrn</span><span class="value">${f(summary.total, 1)} mm</span></div>
                     <div class="data-point data-point-max"><span>Najvyšší denný úhrn</span><span class="value">${f(summary.max, 1)} mm</span><span class="timestamp">${t(summary.maxTime)}</span></div>
                     <div class="data-point data-point-avg"><span>Priemerný denný úhrn</span><span class="value">${f(summary.avg, 1)} mm</span></div>
                 </div></div>`;
@@ -133,3 +133,4 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     init();
 });
+
