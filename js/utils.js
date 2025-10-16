@@ -15,11 +15,17 @@ export function formatTimestampToLocalDate(timestamp) {
 }
 
 /**
- * NOVÁ FUNKCIA: Konvertuje timestamp na lokálny časový reťazec (HH:MM).
- * @param {number} timestamp - Čas v milisekundách.
- * @returns {string} Čas v tvare HH:MM.
+ * NOVÁ FUNKCIA: Konvertuje timestamp na formát DD.MM.
  */
+export function formatTimestampToDayMonth(timestamp) {
+    if (!timestamp) return '';
+    const dateStr = formatTimestampToLocalDate(timestamp); // YYYY-MM-DD
+    const [_, month, day] = dateStr.split('-');
+    return `${day}.${month}.`;
+}
+
 export function formatTimestampToLocalTime(timestamp) {
+    if (!timestamp) return '';
     const date = new Date(timestamp);
     const localMs = date.getTime() + (LOCAL_OFFSET_HOURS * 60 * 60 * 1000);
     const localDate = new Date(localMs);
@@ -29,7 +35,6 @@ export function formatTimestampToLocalTime(timestamp) {
 
     return `${hours}:${minutes}`;
 }
-
 
 export function degToCard(deg) {
     if (deg === null || isNaN(deg)) return '-';
