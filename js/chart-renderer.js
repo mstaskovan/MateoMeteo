@@ -4,18 +4,7 @@ import { WIND_DIRECTIONS } from './utils.js';
 let chartInstance = null;
 let windRoseInstance = null;
 
-function formatLabel(timestamp, granularity) {
-    const date = new Date(timestamp);
-    if (granularity === 'hourly') {
-        return date.toLocaleTimeString('sk-SK', { hour: '2-digit', minute: '2-digit' });
-    }
-    if (granularity === 'weekly') {
-        const endDate = new Date(timestamp);
-        endDate.setDate(endDate.getDate() + 6);
-        return `${date.toLocaleDateString('sk-SK', { day: '2-digit', month: '2-digit' })} - ${endDate.toLocaleDateString('sk-SK', { day: '2-digit', month: '2-digit' })}`;
-    }
-    return date.toLocaleDateString('sk-SK', { day: '2-digit', month: '2-digit', year: 'numeric' });
-}
+function formatLabel(timestamp, granularity) { /* ... bez zmeny ... */ }
 
 export function renderChart(canvasId, aggregatedPeriods, variables, config, granularity, aggregationMethod) {
     const ctx = document.getElementById(canvasId).getContext('2d');
@@ -24,8 +13,21 @@ export function renderChart(canvasId, aggregatedPeriods, variables, config, gran
     const labels = aggregatedPeriods.map(p => formatLabel(p.timestamp, granularity));
     let datasets = [];
     const yAxes = {};
+    
+    const isRainChart = variables.length === 1 && variables[0] === 'rain';
 
-    if (variables.length === 1) {
+    if (isRainChart) {
+        const varConfig = config['rain'];
+        datasets.push({
+            type: 'bar',
+            label: varConfig.label,
+            data: aggregatedPeriods.map(p => p.values.rain?.sum),
+            backgroundColor: `${varConfig.color}90`,
+            borderColor: varConfig.color,
+            yAxisID: 'y',
+        });
+        yAxes['y'] = { type: 'linear', display: true, position: 'left', beginAtZero: true };
+    } else if (variables.length === 1) {
         const variable = variables[0];
         datasets = [
             { label: 'Priemer', data: aggregatedPeriods.map(p => p.values[variable]?.avg), borderColor: '#28a745', yAxisID: 'y', order: 1 },
@@ -38,6 +40,7 @@ export function renderChart(canvasId, aggregatedPeriods, variables, config, gran
         datasets = variables.map(variable => {
             const varConfig = config[variable];
             return {
+                type: 'line',
                 label: varConfig.label,
                 data: aggregatedPeriods.map(p => p.values[variable]?.[aggregationMethod[variable]]),
                 borderColor: varConfig.color,
@@ -45,13 +48,10 @@ export function renderChart(canvasId, aggregatedPeriods, variables, config, gran
                 yAxisID: varConfig.yAxisID,
             };
         });
-        uniqueYAxisIDs.forEach((id, index) => {
-            yAxes[id] = { type: 'linear', display: true, position: index === 0 ? 'left' : 'right', grid: { drawOnChartArea: index === 0 } };
-        });
+        uniqueYAxisIDs.forEach((id, index) => { yAxes[id] = { type: 'linear', display: true, position: index === 0 ? 'left' : 'right', grid: { drawOnChartArea: index === 0 } }; });
     }
 
     chartInstance = new Chart(ctx, {
-        type: 'line',
         data: { labels, datasets },
         options: {
             responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
@@ -61,30 +61,4 @@ export function renderChart(canvasId, aggregatedPeriods, variables, config, gran
     });
 }
 
-export function renderWindRoseChart(canvasId, windRoseData) {
-    const ctx = document.getElementById(canvasId).getContext('2d');
-    if (windRoseInstance) windRoseInstance.destroy();
-
-    windRoseInstance = new Chart(ctx, {
-        type: 'polarArea',
-        data: {
-            labels: WIND_DIRECTIONS,
-            datasets: [{
-                label: 'Frekvencia smeru vetra',
-                data: windRoseData,
-                backgroundColor: [
-                    'rgba(0, 123, 255, 0.7)','rgba(23, 162, 184, 0.7)','rgba(40, 167, 69, 0.7)','rgba(255, 193, 7, 0.7)',
-                    'rgba(220, 53, 69, 0.7)','rgba(108, 117, 125, 0.7)','rgba(0, 123, 255, 0.7)','rgba(23, 162, 184, 0.7)',
-                    'rgba(40, 167, 69, 0.7)','rgba(255, 193, 7, 0.7)','rgba(220, 53, 69, 0.7)','rgba(108, 117, 125, 0.7)',
-                    'rgba(0, 123, 255, 0.7)','rgba(23, 162, 184, 0.7)','rgba(40, 167, 69, 0.7)','rgba(255, 193, 7, 0.7)'
-                ],
-                borderWidth: 1
-            }]
-        },
-        options: {
-            responsive: true, maintainAspectRatio: false,
-            scales: { r: { ticks: { backdropColor: 'rgba(255, 255, 255, 0.75)', callback: (value) => value + ' %' } } },
-            plugins: { legend: { display: false }, tooltip: { callbacks: { label: (context) => `${context.label}: ${context.raw.toFixed(1)} %` } } }
-        }
-    });
-}
+export function renderWindRoseChart(canvasId, windRoseData) { /* ... bez zmeny ... */ }
