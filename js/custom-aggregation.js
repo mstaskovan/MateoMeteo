@@ -1,14 +1,12 @@
 // js/custom-aggregation.js
 import { formatTimestampToLocalDate } from './utils.js';
 
-const UNITS = { temp: '°C', hum: '%', press: 'hPa', rain: 'mm', ws: 'm/s', wg: 'm/s', sr: 'W/m²', uv: 'UV' };
-const AGGREGATION_METHOD = { temp: 'avg', hum: 'avg', press: 'avg', ws: 'avg', wg: 'max', rain: 'sum', sr: 'max', uv: 'max' };
+const UNITS = { temp: '°C', hum: '%', press: 'hPa', rain: 'mm', ws: 'm/s', wg: 'm/s', sr: 'W/m²', uv: 'UV', rr: 'mm/h' };
+const AGGREGATION_METHOD = { temp: 'avg', hum: 'avg', press: 'avg', ws: 'avg', wg: 'max', rain: 'sum', sr: 'max', uv: 'max', rr: 'max' };
 
 function getGroupKey(timestamp, granularity) {
     const date = new Date(timestamp);
-    if (granularity === 'hourly') {
-        return date.setMinutes(0, 0, 0);
-    }
+    if (granularity === 'hourly') return date.setMinutes(0, 0, 0);
     if (granularity === 'weekly') {
         const day = date.getDay();
         const diff = date.getDate() - day + (day === 0 ? -6 : 1);
@@ -19,12 +17,30 @@ function getGroupKey(timestamp, granularity) {
 
 export function aggregateCustomRange(data, variables, rangeInDays) {
     let granularity;
-    if (rangeInDays <= 1) granularity = 'hourly';
+    if (rangeInDays <= 2) granularity = 'hourly';
     else if (rangeInDays > 90) granularity = 'weekly';
     else granularity = 'daily';
 
+    // Predspracovanie dát pre výpočet prírastkov zrážok
+    let processedData = data;
+    if (variables.includes('rain')) {
+        let lastRainValue = -1;
+        processedData = data.map(item => {
+            const newItem = { ...item };
+            if (newItem.rain !== null) {
+                if (newItem.rain < lastRainValue) lastRainValue = 0;
+                if (lastRainValue === -1) lastRainValue = newItem.rain > 0 ? newItem.rain : 0;
+                newItem.rainIncrement = newItem.rain - lastRainValue;
+                lastRainValue = newItem.rain;
+            } else {
+                newItem.rainIncrement = null;
+            }
+            return newItem;
+        });
+    }
+
     const groupedData = new Map();
-    data.forEach(item => {
+    processedData.forEach(item => {
         const key = getGroupKey(item.t, granularity);
         if (!groupedData.has(key)) groupedData.set(key, []);
         groupedData.get(key).push(item);
@@ -35,7 +51,8 @@ export function aggregateCustomRange(data, variables, rangeInDays) {
         const periodItems = groupedData.get(key);
         const periodResult = { timestamp: key, values: {} };
         variables.forEach(variable => {
-            const values = periodItems.map(item => item[variable]).filter(v => v !== null);
+            const targetProperty = variable === 'rain' ? 'rainIncrement' : variable;
+            const values = periodItems.map(item => item[targetProperty]).filter(v => v !== null);
             if (values.length === 0) {
                 periodResult.values[variable] = { min: null, avg: null, max: null, sum: null };
                 return;
@@ -46,22 +63,6 @@ export function aggregateCustomRange(data, variables, rangeInDays) {
         aggregatedPeriods.push(periodResult);
     });
 
-    let windRoseData = null;
-    if (variables.includes('ws') || variables.includes('wg')) {
-        const directionCounts = new Array(16).fill(0);
-        let totalCount = 0;
-        data.forEach(item => {
-            if (item.ws !== null && item.ws > 0.5 && item.wd !== null) {
-                const sectorIndex = Math.floor((item.wd / 22.5) + 0.5) % 16;
-                directionCounts[sectorIndex]++;
-                totalCount++;
-            }
-        });
-        if (totalCount > 0) {
-            windRoseData = directionCounts.map(count => (count / totalCount) * 100);
-        }
-    }
-
     const summaries = {};
     variables.forEach(variable => {
         const allItems = data.filter(item => item[variable] !== null);
@@ -71,21 +72,22 @@ export function aggregateCustomRange(data, variables, rangeInDays) {
         }
 
         if (variable === 'rain') {
-            const dailyTotals = aggregatedPeriods.map(d => d.values.rain?.sum).filter(v => v !== null && v !== undefined);
-            if (dailyTotals.length > 0) {
-                const maxDay = Math.max(...dailyTotals);
-                const maxDayIndex = dailyTotals.indexOf(maxDay);
+            const periodTotals = aggregatedPeriods.map(p => p.values.rain?.sum).filter(v => v !== null && v !== undefined);
+            const allRainRates = data.map(item => item.rr).filter(v => v !== null);
+
+            if (periodTotals.length > 0) {
+                const maxPeriodValue = Math.max(...periodTotals);
+                const maxPeriodIndex = periodTotals.indexOf(maxPeriodValue);
                 summaries[variable] = {
-                    total: dailyTotals.reduce((a, b) => a + b, 0),
-                    max: maxDay,
-                    maxTime: aggregatedPeriods[maxDayIndex]?.timestamp,
-                    avg: dailyTotals.reduce((a, b) => a + b, 0) / dailyTotals.length,
+                    total: periodTotals.reduce((a, b) => a + b, 0),
+                    max: maxPeriodValue,
+                    maxTime: aggregatedPeriods[maxPeriodIndex]?.timestamp,
+                    maxRate: allRainRates.length > 0 ? Math.max(...allRainRates) : null,
                 };
             }
         } else {
             const allValues = allItems.map(item => item[variable]);
             const maxVal = Math.max(...allValues);
-            
             let minVal;
             if (variable === 'ws' || variable === 'wg') {
                 const nonZeroValues = allValues.filter(v => v > 0);
@@ -93,7 +95,6 @@ export function aggregateCustomRange(data, variables, rangeInDays) {
             } else {
                 minVal = Math.min(...allValues);
             }
-
             summaries[variable] = {
                 max: maxVal,
                 min: minVal,
@@ -105,5 +106,5 @@ export function aggregateCustomRange(data, variables, rangeInDays) {
         }
     });
     
-    return { aggregatedPeriods, summaries, granularity, aggregationMethod: AGGREGATION_METHOD, windRoseData };
+    return { aggregatedPeriods, summaries, granularity, aggregationMethod: AGGREGATION_METHOD };
 }
