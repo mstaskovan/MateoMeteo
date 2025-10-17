@@ -39,7 +39,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             let minLabel = 'Minimum';
             if (variable === 'ws' || variable === 'wg') minLabel = 'Minimum > 0';
 
-            html += `<div class="summary-box"><h4>Súhrn (${config.label})</h4><div class="data-points">`;
+            html += `<div class="summary-box"><h4>Súhrn ${config.label}</h4><div class="data-points">`;
             
             if (variable === 'rain') {
                 html += `<div class="data-point data-point-avg"><span>Celkový úhrn</span><span class="value">${f(summary.total, 1)} mm</span></div>
@@ -56,3 +56,4 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     init();
 });
+
