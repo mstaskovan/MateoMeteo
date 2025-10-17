@@ -26,11 +26,16 @@ export function aggregateCustomRange(data, variables) {
                 dayValues[variable] = null;
                 return;
             }
+
+            // =======================================================
+            // KĽÚČOVÁ OPRAVA: Správny kumulatívny výpočet pre zrážky
+            // =======================================================
             if (variable === 'rain') {
                 dayValues[variable] = Math.max(...values) - Math.min(...values);
             } else {
                 dayValues[variable] = values.reduce((a, b) => a + b, 0) / values.length;
             }
+            // =======================================================
         });
         dailyData.push({ date: day, values: dayValues });
     });
@@ -60,9 +65,6 @@ export function aggregateCustomRange(data, variables) {
             const allValues = allItems.map(item => item[variable]);
             const maxVal = Math.max(...allValues);
             
-            // =======================================================
-            // KĽÚČOVÁ ZMENA: Nájdenie minima väčšieho ako nula pre vietor
-            // =======================================================
             let minVal;
             if (variable === 'ws' || variable === 'wg') {
                 const nonZeroValues = allValues.filter(v => v > 0);
@@ -70,7 +72,6 @@ export function aggregateCustomRange(data, variables) {
             } else {
                 minVal = Math.min(...allValues);
             }
-            // =======================================================
 
             summaries[variable] = {
                 max: maxVal,
