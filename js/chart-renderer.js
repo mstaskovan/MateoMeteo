@@ -23,19 +23,19 @@ export function renderChart(canvasId, aggregatedPeriods, variables, config, gran
     let datasets = [];
     const yAxes = {};
 
-    // =======================================================
-    // ZMENA: Režim 1 teraz vždy zobrazuje Min/Avg/Max
-    // =======================================================
+    // Režim 1: Detailná analýza (len 1 premenná)
     if (variables.length === 1) {
         const variable = variables[0];
         const varConfig = config[variable];
         
         datasets = [
-            // Krivka PRIEMERU (vždy)
+            // =======================================================
+            // ZMENA: Krivka PRIEMERU je teraz vždy zelená a má jednoduchý názov
+            // =======================================================
             {
-                label: `Priemer (${varConfig.label})`,
+                label: 'Priemer', // Zjednodušený názov
                 data: aggregatedPeriods.map(p => p.values[variable]?.avg),
-                borderColor: varConfig.color,
+                borderColor: '#28a745', // Napevno nastavená zelená farba
                 yAxisID: 'y',
                 order: 1
             },
@@ -43,17 +43,17 @@ export function renderChart(canvasId, aggregatedPeriods, variables, config, gran
             {
                 label: 'Minimum',
                 data: aggregatedPeriods.map(p => p.values[variable]?.min),
-                borderColor: '#64b5f6', // Svetlomodrá
+                borderColor: '#64b5f6',
                 yAxisID: 'y',
                 pointRadius: 0,
                 borderWidth: 1,
-                fill: '+1' // Vyplní priestor po ďalšiu krivku (Maximum)
+                fill: '+1'
             },
             // Krivka MAXIMA
             {
                 label: 'Maximum',
                 data: aggregatedPeriods.map(p => p.values[variable]?.max),
-                borderColor: '#f87171', // Svetločervená
+                borderColor: '#f87171',
                 backgroundColor: 'rgba(248, 113, 113, 0.1)',
                 yAxisID: 'y',
                 pointRadius: 0,
