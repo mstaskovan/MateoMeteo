@@ -2,83 +2,62 @@
 import { formatTimestampToLocalDate } from './utils.js';
 
 const UNITS = { temp: '°C', hum: '%', press: 'hPa', rain: 'mm', ws: 'm/s', wg: 'm/s', sr: 'W/m²', uv: 'UV' };
-const AGGREGATION_METHOD = { temp: 'avg', hum: 'avg', press: 'avg', ws: 'avg', wg: 'max', rain: 'sum', sr: 'max', uv: 'max' };
 
-function getGroupKey(timestamp, granularity) {
-    const date = new Date(timestamp);
-    if (granularity === 'hourly') {
-        return date.setMinutes(0, 0, 0);
-    }
-    if (granularity === 'weekly') {
-        const day = date.getDay();
-        const diff = date.getDate() - day + (day === 0 ? -6 : 1);
-        return new Date(date.setDate(diff)).setHours(0, 0, 0, 0);
-    }
-    return date.setHours(0, 0, 0, 0);
-}
-
-export function aggregateCustomRange(data, variables, rangeInDays) {
-    let granularity;
-    if (rangeInDays <= 1) granularity = 'hourly';
-    else if (rangeInDays > 90) granularity = 'weekly';
-    else granularity = 'daily';
-
-    const groupedData = new Map();
+export function aggregateCustomRange(data, variables) {
+    // 1. Zoskupenie dát podľa dní
+    const dailyDataMap = new Map();
     data.forEach(item => {
-        const key = getGroupKey(item.t, granularity);
-        if (!groupedData.has(key)) groupedData.set(key, []);
-        groupedData.get(key).push(item);
+        const day = formatTimestampToLocalDate(item.t);
+        if (!dailyDataMap.has(day)) dailyDataMap.set(day, {});
+        
+        variables.forEach(variable => {
+            if (!dailyDataMap.get(day)[variable]) dailyDataMap.get(day)[variable] = [];
+            dailyDataMap.get(day)[variable].push(item[variable]);
+        });
     });
 
-    const aggregatedPeriods = [];
-    Array.from(groupedData.keys()).sort((a,b) => a-b).forEach(key => {
-        const periodItems = groupedData.get(key);
-        const periodResult = { timestamp: key, values: {} };
+    // 2. Výpočet denných hodnôt pre graf
+    const dailyData = [];
+    Array.from(dailyDataMap.keys()).sort().forEach(day => {
+        const dayValues = {};
         variables.forEach(variable => {
-            const values = periodItems.map(item => item[variable]).filter(v => v !== null);
+            const values = dailyDataMap.get(day)[variable].filter(v => v !== null);
             if (values.length === 0) {
-                periodResult.values[variable] = { min: null, avg: null, max: null, sum: null };
+                dayValues[variable] = null;
                 return;
             }
-            const sum = values.reduce((a, b) => a + b, 0);
-            periodResult.values[variable] = { min: Math.min(...values), avg: sum / values.length, max: Math.max(...values), sum: sum };
+
+            // =======================================================
+            // KĽÚČOVÁ OPRAVA: Správny kumulatívny výpočet pre zrážky
+            // =======================================================
+            if (variable === 'rain') {
+                dayValues[variable] = Math.max(...values) - Math.min(...values);
+            } else {
+                dayValues[variable] = values.reduce((a, b) => a + b, 0) / values.length;
+            }
+            // =======================================================
         });
-        aggregatedPeriods.push(periodResult);
+        dailyData.push({ date: day, values: dayValues });
     });
 
-    let windRoseData = null;
-    if (variables.includes('ws') || variables.includes('wg')) {
-        const directionCounts = new Array(16).fill(0);
-        let totalCount = 0;
-        data.forEach(item => {
-            if (item.ws !== null && item.ws > 0.5 && item.wd !== null) {
-                const sectorIndex = Math.floor((item.wd / 22.5) + 0.5) % 16;
-                directionCounts[sectorIndex]++;
-                totalCount++;
-            }
-        });
-        if (totalCount > 0) {
-            windRoseData = directionCounts.map(count => (count / totalCount) * 100);
-        }
-    }
-
+    // 3. Výpočet celkových štatistík pre boxy
     const summaries = {};
     variables.forEach(variable => {
         const allItems = data.filter(item => item[variable] !== null);
         if (allItems.length === 0) {
-            summaries[variable] = { max: null, min: null, avg: null, total: null };
+            summaries[variable] = { max: null, min: null, avg: null, maxTime: null, minTime: null };
             return;
         }
 
         if (variable === 'rain') {
-            const dailyTotals = aggregatedPeriods.map(d => d.values.rain?.sum).filter(v => v !== null && v !== undefined);
+            const dailyTotals = dailyData.map(d => d.values.rain).filter(v => v !== null);
             if (dailyTotals.length > 0) {
                 const maxDay = Math.max(...dailyTotals);
                 const maxDayIndex = dailyTotals.indexOf(maxDay);
                 summaries[variable] = {
                     total: dailyTotals.reduce((a, b) => a + b, 0),
                     max: maxDay,
-                    maxTime: aggregatedPeriods[maxDayIndex]?.timestamp,
+                    maxTime: new Date(dailyData[maxDayIndex].date).getTime(),
                     avg: dailyTotals.reduce((a, b) => a + b, 0) / dailyTotals.length,
                 };
             }
@@ -105,5 +84,5 @@ export function aggregateCustomRange(data, variables, rangeInDays) {
         }
     });
     
-    return { aggregatedPeriods, summaries, granularity, aggregationMethod: AGGREGATION_METHOD, windRoseData };
+    return { dailyData, summaries };
 }
