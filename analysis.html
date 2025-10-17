@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MateoMeteo | Analýza</title>
+    <title>MateoMeteo | analýza histórie</title>
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="css/styles.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -15,8 +15,8 @@
         <a href="index.html" class="nav-logo">Mateo Meteo</a>
         <ul class="nav-menu">
             <li class="nav-item"><a href="index.html" class="nav-link">Dashboard</a></li>
-            <li class="nav-item"><a href="analysis.html" class="nav-link">Analýza</a></li>
-            <li class="nav-item"><a href="https://app.weathercloud.net/d8786709109#profile" target="_blank" class="nav-link">Weathercloud</a></li>
+            <li class="nav-item"><a href="analysis.html" class="nav-link">Analýza histórie</a></li>
+            <li class="nav-item"><a href="https://app.weathercloud.net/d8786709109#profile" target="_blank" class="nav-link">Aktuálne na Weathercloud</a></li>
         </ul>
         <div class="nav-controls">
             <button id="themeToggle" class="theme-toggle" onclick="toggleTheme()"><span id="themeIcon">☀️</span></button>
@@ -27,41 +27,31 @@
 
 <main>
 <div class="container">
-    <h1>DETAILNÁ ANALÝZA DÁT</h1>
-    <h2>NASTAVENIE ANALÝZY</h2>
-    <div id="data-availability-analysis" class="data-availability-info">
-        <p>Načítavam informácie o dostupných dátach...</p>
-    </div>
+    <h1>Detailná Analýza Dát</h1>
+    <h2>Nastavenia Analýzy</h2>
+    <div id="data-availability-analysis" class="data-availability-info"><p>Načítavam informácie o dostupných dátach...</p></div>
 
     <div class="control-panel analysis-panel">
-        <div>
-            <label for="variableSelect1">1. Premenná (ľavá os)</label>
-            <select id="variableSelect1"></select>
-        </div>
-        <div>
-            <label for="variableSelect2">2. Premenná (pravá os)</label>
-            <select id="variableSelect2"></select>
-        </div>
-        <div>
-            <label for="dateFrom">Dátum od</label>
-            <input type="date" id="dateFrom">
-        </div>
-        <div>
-            <label for="dateTo">Dátum do</label>
-            <input type="date" id="dateTo">
-        </div>
+        <div><label for="variableSelect1">1. Premenná (ľavá os)</label><select id="variableSelect1"></select></div>
+        <div><label for="variableSelect2">2. Premenná (pravá os)</label><select id="variableSelect2"></select></div>
+        <div><label for="dateFrom">Dátum od</label><input type="date" id="dateFrom"></div>
+        <div><label for="dateTo">Dátum do</label><input type="date" id="dateTo"></div>
         <div style="display: flex; align-items: flex-end;"><button id="analyzeButton">Analyzovať obdobie</button></div>
     </div>
 
     <div id="analysis-output" class="output-section" style="display: none;">
         <h2>Výsledky analýzy pre <span id="variable-name"></span></h2>
         <div id="analysis-summary" class="summary-dashboard"></div>
+        
         <div class="chart-container"><canvas id="analysisChart"></canvas></div>
+        
+        <div id="wind-rose-container" class="chart-container" style="display: none;">
+            <h3>Frekvencia Smeru Vetra</h3>
+            <canvas id="windRoseChart"></canvas>
+        </div>
     </div>
 
-    <div id="placeholder-analysis" class="placeholder-data">
-        <p>Zvoľte premennú a rozsah dátumov a kliknite na "Analyzovať Obdobie".</p>
-    </div>
+    <div id="placeholder-analysis" class="placeholder-data"><p>Zvoľte premennú a rozsah dátumov a kliknite na "Analyzovať Obdobie".</p></div>
 </div>
 </main>
 
@@ -72,4 +62,3 @@
 
 </body>
 </html>
-
