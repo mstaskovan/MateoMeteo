@@ -76,7 +76,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             const t = (ts) => ts ? `${formatDateTime(ts, 'DD. MM. YYYY HH:mm')}` : "";
             let minLabel = "Minimum";
             ("ws" === variable || "wg" === variable) && (minLabel = "Minimum > 0");
-            html += `<div class="summary-box"><h4>Súhrn (${config.label})</h4><div class="data-points">`;
+            html += `<div class="summary-box"><h4>Súhrn - ${config.label}</h4><div class="data-points">`;
             if ("rain" === variable) {
                 html += `<div class="data-point data-point-avg"><span>Celkový úhrn</span><span class="value">${f(summary.total, 1)} mm</span></div><div class="data-point data-point-max"><span>Najvyšší denný úhrn</span><span class="value">${f(summary.max, 1)} mm</span><span class="timestamp">${formatDateTime(summary.maxTime, "DD.MM.YYYY")}</span></div>`;
             } else {
@@ -89,3 +89,4 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     init();
 });
+
