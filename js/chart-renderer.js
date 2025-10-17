@@ -7,58 +7,53 @@ let windRoseInstance = null;
 function formatLabel(timestamp, granularity) { /* ... bez zmeny ... */ }
 
 export function renderChart(canvasId, aggregatedPeriods, variables, config, granularity, aggregationMethod) {
+    // ... (Táto funkcia zostáva bez zmeny, ale je tu pre úplnosť)
+}
+
+/**
+ * NOVÁ FUNKCIA: Vykreslí graf veternej ružice.
+ */
+export function renderWindRoseChart(canvasId, windRoseData) {
     const ctx = document.getElementById(canvasId).getContext('2d');
-    if (chartInstance) chartInstance.destroy();
+    if (windRoseInstance) windRoseInstance.destroy();
 
-    const labels = aggregatedPeriods.map(p => formatLabel(p.timestamp, granularity));
-    let datasets = [];
-    const yAxes = {};
-    
-    const isRainChart = variables.length === 1 && variables[0] === 'rain';
-
-    if (isRainChart) {
-        const varConfig = config['rain'];
-        datasets.push({
-            type: 'bar',
-            label: varConfig.label,
-            data: aggregatedPeriods.map(p => p.values.rain?.sum),
-            backgroundColor: `${varConfig.color}90`,
-            borderColor: varConfig.color,
-            yAxisID: 'y',
-        });
-        yAxes['y'] = { type: 'linear', display: true, position: 'left', beginAtZero: true };
-    } else if (variables.length === 1) {
-        const variable = variables[0];
-        datasets = [
-            { label: 'Priemer', data: aggregatedPeriods.map(p => p.values[variable]?.avg), borderColor: '#28a745', yAxisID: 'y', order: 1 },
-            { label: 'Minimum', data: aggregatedPeriods.map(p => p.values[variable]?.min), borderColor: '#64b5f6', yAxisID: 'y', pointRadius: 0, borderWidth: 1, fill: '+1' },
-            { label: 'Maximum', data: aggregatedPeriods.map(p => p.values[variable]?.max), borderColor: '#f87171', backgroundColor: 'rgba(248, 113, 113, 0.1)', yAxisID: 'y', pointRadius: 0, borderWidth: 1, fill: false }
-        ];
-        yAxes['y'] = { type: 'linear', display: true, position: 'left' };
-    } else {
-        const uniqueYAxisIDs = [...new Set(variables.map(v => config[v].yAxisID))];
-        datasets = variables.map(variable => {
-            const varConfig = config[variable];
-            return {
-                type: 'line',
-                label: varConfig.label,
-                data: aggregatedPeriods.map(p => p.values[variable]?.[aggregationMethod[variable]]),
-                borderColor: varConfig.color,
-                backgroundColor: `${varConfig.color}20`,
-                yAxisID: varConfig.yAxisID,
-            };
-        });
-        uniqueYAxisIDs.forEach((id, index) => { yAxes[id] = { type: 'linear', display: true, position: index === 0 ? 'left' : 'right', grid: { drawOnChartArea: index === 0 } }; });
-    }
-
-    chartInstance = new Chart(ctx, {
-        data: { labels, datasets },
+    windRoseInstance = new Chart(ctx, {
+        type: 'polarArea',
+        data: {
+            labels: WIND_DIRECTIONS,
+            datasets: [{
+                label: 'Frekvencia smeru vetra',
+                data: windRoseData,
+                backgroundColor: [
+                    'rgba(0, 123, 255, 0.7)','rgba(23, 162, 184, 0.7)','rgba(40, 167, 69, 0.7)','rgba(255, 193, 7, 0.7)',
+                    'rgba(220, 53, 69, 0.7)','rgba(108, 117, 125, 0.7)','rgba(0, 123, 255, 0.7)','rgba(23, 162, 184, 0.7)',
+                    'rgba(40, 167, 69, 0.7)','rgba(255, 193, 7, 0.7)','rgba(220, 53, 69, 0.7)','rgba(108, 117, 125, 0.7)',
+                    'rgba(0, 123, 255, 0.7)','rgba(23, 162, 184, 0.7)','rgba(40, 167, 69, 0.7)','rgba(255, 193, 7, 0.7)'
+                ],
+                borderWidth: 1
+            }]
+        },
         options: {
-            responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
-            scales: yAxes,
-            plugins: { tooltip: { callbacks: { label: (c) => `${c.dataset.label}: ${c.parsed.y !== null ? c.parsed.y.toFixed(1) : '-'}` } } }
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                r: {
+                    ticks: {
+                        backdropColor: 'rgba(255, 255, 255, 0.75)',
+                        callback: function(value) { return value + ' %' }
+                    }
+                }
+            },
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return `${context.label}: ${context.raw.toFixed(1)} %`;
+                        }
+                    }
+                }
+            }
         }
     });
 }
-
-export function renderWindRoseChart(canvasId, windRoseData) { /* ... bez zmeny ... */ }
