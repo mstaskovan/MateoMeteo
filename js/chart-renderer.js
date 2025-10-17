@@ -2,7 +2,6 @@
 
 let chartInstance = null;
 
-// Formátovač pre popisky na osi X (čas, deň, týždeň)
 function formatLabel(timestamp, granularity) {
     const date = new Date(timestamp);
     if (granularity === 'hourly') {
@@ -24,21 +23,23 @@ export function renderChart(canvasId, aggregatedPeriods, variables, config, gran
     let datasets = [];
     const yAxes = {};
 
-    // Režim 1: Detailná analýza (len 1 premenná)
+    // =======================================================
+    // ZMENA: Režim 1 teraz vždy zobrazuje Min/Avg/Max
+    // =======================================================
     if (variables.length === 1) {
         const variable = variables[0];
         const varConfig = config[variable];
         
         datasets = [
-            // Hlavná krivka (priemer, max alebo súčet)
+            // Krivka PRIEMERU (vždy)
             {
-                label: varConfig.label,
-                data: aggregatedPeriods.map(p => p.values[variable]?.[aggregationMethod[variable]]),
+                label: `Priemer (${varConfig.label})`,
+                data: aggregatedPeriods.map(p => p.values[variable]?.avg),
                 borderColor: varConfig.color,
                 yAxisID: 'y',
-                order: 1 // Vykreslí sa navrchu
+                order: 1
             },
-            // Krivka minima
+            // Krivka MINIMA
             {
                 label: 'Minimum',
                 data: aggregatedPeriods.map(p => p.values[variable]?.min),
@@ -48,12 +49,12 @@ export function renderChart(canvasId, aggregatedPeriods, variables, config, gran
                 borderWidth: 1,
                 fill: '+1' // Vyplní priestor po ďalšiu krivku (Maximum)
             },
-            // Krivka maxima
+            // Krivka MAXIMA
             {
                 label: 'Maximum',
                 data: aggregatedPeriods.map(p => p.values[variable]?.max),
                 borderColor: '#f87171', // Svetločervená
-                backgroundColor: 'rgba(248, 113, 113, 0.1)', // Priesvitná výplň
+                backgroundColor: 'rgba(248, 113, 113, 0.1)',
                 yAxisID: 'y',
                 pointRadius: 0,
                 borderWidth: 1,
@@ -62,10 +63,9 @@ export function renderChart(canvasId, aggregatedPeriods, variables, config, gran
         ];
         yAxes['y'] = { type: 'linear', display: true, position: 'left' };
 
-    // Režim 2: Korelačná analýza (2 premenné)
+    // Režim 2: Korelačná analýza (zostáva bez zmeny)
     } else {
         const uniqueYAxisIDs = [...new Set(variables.map(v => config[v].yAxisID))];
-        
         datasets = variables.map(variable => {
             const varConfig = config[variable];
             return {
@@ -76,7 +76,6 @@ export function renderChart(canvasId, aggregatedPeriods, variables, config, gran
                 yAxisID: varConfig.yAxisID,
             };
         });
-
         uniqueYAxisIDs.forEach((id, index) => {
             yAxes[id] = {
                 type: 'linear', display: true, position: index === 0 ? 'left' : 'right',
