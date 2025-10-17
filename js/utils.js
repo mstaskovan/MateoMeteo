@@ -12,6 +12,7 @@ export function formatTimestampToLocalTime(timestamp) { if (!timestamp) return '
 export function degToCard(deg) {
     if (deg === null || isNaN(deg)) return '-';
     const val = Math.floor((deg / 22.5) + 0.5);
+    // Prevod na slovenské skratky
     const arr = ["S", "SSV", "SV", "VSV", "V", "JVV", "JV", "JJV", "J", "JJZ", "JZ", "ZJZ", "Z", "ZSZ", "SZ", "SSZ"];
     return arr[val % 16];
 }
