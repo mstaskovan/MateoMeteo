@@ -4,14 +4,14 @@ import { LOCAL_OFFSET_HOURS, formatTimestampToLocalDate } from './utils.js';
 
 /**
  * OPRAVENÁ FUNKCIA: Určí najčastejší smer vetra.
- * Prahová hodnota vrátená na pôvodnú hodnotu 0.5 m/s.
  */
 function calculateWindMode(items) {
     const wdCounts = new Map();
-    const MIN_WIND_SPEED_FILTER = 0.5; // HODNOTA VRÁTENÁ SPÄŤ NA 0.5 m/s
+    const MIN_WIND_SPEED_FILTER = 0.5;
 
     items.forEach(item => {
-        if (item.ws !== null && item.ws >= MIN_WUD_SPEED_FILTER && item.wd !== null) {
+        // OPRAVA: Správny názov premennej (bol tu preklep MIN_WUD_SPEED_FILTER)
+        if (item.ws !== null && item.ws >= MIN_WIND_SPEED_FILTER && item.wd !== null) {
             wdCounts.set(item.wd, (wdCounts.get(item.wd) || 0) + 1);
         }
     });
@@ -29,7 +29,6 @@ function calculateWindMode(items) {
 
 /**
  * Hlavná funkcia pre výpočet súhrnných štatistík pre dané obdobie.
- * Vrátená k pôvodnej, stabilnej logike pre výpočet zrážok.
  */
 function calculateOverallSummary(items) {
     if (items.length === 0) return null;
@@ -93,7 +92,6 @@ function calculateOverallSummary(items) {
         wgMaxTime: metrics.wg.maxT,
         wgMin: metrics.wg.min !== Infinity ? metrics.wg.min : null,
         wgMinTime: metrics.wg.minT,
-        // PÔVODNÁ LOGIKA VÝPOČTU ÚHRNU PRE DANÉ OBDOBIE (napr. deň alebo hodinu)
         rainTotal: (metrics.rain.max !== -Infinity) ? metrics.rain.max - metrics.rain.min : null,
         srAvg: metrics.sr.count > 0 ? metrics.sr.sum / metrics.sr.count : null,
         srMax: metrics.sr.max !== -Infinity ? metrics.sr.max : null,
