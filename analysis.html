@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MateoMeteo | Analýza</title>
+    <title>MateoMeteo | analýza histórie</title>
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="css/styles.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -18,34 +18,39 @@
             <li class="nav-item"><a href="analysis.html" class="nav-link">Analýza</a></li>
             <li class="nav-item"><a href="https://app.weathercloud.net/d8786709109#profile" target="_blank" class="nav-link">Weathercloud</a></li>
         </ul>
-        
         <div class="nav-controls">
-            <button id="themeToggle" class="theme-toggle" onclick="toggleTheme()">
-                <span id="themeIcon">☀️</span>
-            </button>
-            <div class="hamburger">
-                <span class="bar"></span><span class="bar"></span><span class="bar"></span>
-            </div>
+            <button id="themeToggle" class="theme-toggle" onclick="toggleTheme()"><span id="themeIcon">☀️</span></button>
+            <div class="hamburger"><span class="bar"></span><span class="bar"></span><span class="bar"></span></div>
         </div>
     </div>
 </nav>
 
 <main>
 <div class="container">
-    
-    <h1>DETAILNÁ ANALÝZA HISTORICKÝCH DÁT</h1>
-    
+    <h1>DETAILNÁ ANALÝZA DÁT</h1>
     <h2>NASTAVENIE ANALÝZY</h2>
     <div id="data-availability-analysis" class="data-availability-info">
         <p>Načítavam informácie o dostupných dátach...</p>
     </div>
 
     <div class="control-panel analysis-panel">
-        <div><label for="variableSelect1">1. Premenná</label><select id="variableSelect1"><option value="temp">Teplota (°C)</option><option value="hum">Vlhkosť (%)</option><option value="press">Tlak (hPa)</option><option value="rain">Zrážky (mm)</option><option value="ws">Rýchlosť vetra (m/s)</option><option value="wg">Nárazy vetra (m/s)</option></select></div>
-        <div><label for="variableSelect2">2. Premenná</label><select id="variableSelect2"></select></div>
-        <div><label for="dateFrom">Dátum od</label><input type="date" id="dateFrom"></div>
-        <div><label for="dateTo">Dátum do</label><input type="date" id="dateTo"></div>
-        <div style="display: flex; align-items: flex-end;"><button id="analyzeButton">Analyzovať Obdobie</button></div>
+        <div>
+            <label for="variableSelect1">1. Premenná (ľavá os)</label>
+            <select id="variableSelect1"></select>
+        </div>
+        <div>
+            <label for="variableSelect2">2. Premenná (pravá os)</label>
+            <select id="variableSelect2"></select>
+        </div>
+        <div>
+            <label for="dateFrom">Dátum od</label>
+            <input type="date" id="dateFrom">
+        </div>
+        <div>
+            <label for="dateTo">Dátum do</label>
+            <input type="date" id="dateTo">
+        </div>
+        <div style="display: flex; align-items: flex-end;"><button id="analyzeButton">Analyzovať obdobie</button></div>
     </div>
 
     <div id="analysis-output" class="output-section" style="display: none;">
@@ -67,7 +72,3 @@
 
 </body>
 </html>
-
-
-
-
