@@ -4,6 +4,7 @@ import { formatTimestampToLocalDate } from './utils.js';
 const UNITS = { temp: '°C', hum: '%', press: 'hPa', rain: 'mm', ws: 'm/s', wg: 'm/s' };
 
 export function aggregateCustomRange(data, variables) {
+    // 1. Zoskupenie dát podľa dní
     const dailyDataMap = new Map();
     data.forEach(item => {
         const day = formatTimestampToLocalDate(item.t);
@@ -15,6 +16,7 @@ export function aggregateCustomRange(data, variables) {
         });
     });
 
+    // 2. Výpočet denných hodnôt pre graf
     const dailyData = [];
     Array.from(dailyDataMap.keys()).sort().forEach(day => {
         const dayValues = {};
@@ -33,9 +35,15 @@ export function aggregateCustomRange(data, variables) {
         dailyData.push({ date: day, values: dayValues });
     });
 
+    // 3. Výpočet celkových štatistík pre boxy
     const summaries = {};
     variables.forEach(variable => {
         const allItems = data.filter(item => item[variable] !== null);
+        if (allItems.length === 0) {
+            summaries[variable] = { max: null, min: null, avg: null, maxTime: null, minTime: null };
+            return;
+        }
+
         if (variable === 'rain') {
             const dailyTotals = dailyData.map(d => d.values.rain).filter(v => v !== null);
             if (dailyTotals.length > 0) {
@@ -50,16 +58,28 @@ export function aggregateCustomRange(data, variables) {
             }
         } else {
             const allValues = allItems.map(item => item[variable]);
-            if (allValues.length > 0) {
-                const maxVal = Math.max(...allValues);
-                const minVal = Math.min(...allValues);
-                summaries[variable] = {
-                    max: maxVal, min: minVal,
-                    avg: allValues.reduce((a, b) => a + b, 0) / allValues.length,
-                    maxTime: allItems.find(item => item[variable] === maxVal)?.t,
-                    minTime: allItems.find(item => item[variable] === minVal)?.t,
-                };
+            const maxVal = Math.max(...allValues);
+            
+            // =======================================================
+            // KĽÚČOVÁ ZMENA: Nájdenie minima väčšieho ako nula pre vietor
+            // =======================================================
+            let minVal;
+            if (variable === 'ws' || variable === 'wg') {
+                const nonZeroValues = allValues.filter(v => v > 0);
+                minVal = nonZeroValues.length > 0 ? Math.min(...nonZeroValues) : null;
+            } else {
+                minVal = Math.min(...allValues);
             }
+            // =======================================================
+
+            summaries[variable] = {
+                max: maxVal,
+                min: minVal,
+                avg: allValues.reduce((a, b) => a + b, 0) / allValues.length,
+                maxTime: allItems.find(item => item[variable] === maxVal)?.t,
+                minTime: minVal !== null ? allItems.find(item => item[variable] === minVal)?.t : null,
+                unit: UNITS[variable]
+            };
         }
     });
     
