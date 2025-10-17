@@ -1,87 +1,98 @@
 // js/custom-aggregation.js
 import { formatTimestampToLocalDate } from './utils.js';
 
-const UNITS = { temp: '°C', hum: '%', press: 'hPa', rain: 'mm', ws: 'm/s', wg: 'm/s' };
+const UNITS = { temp: '°C', hum: '%', press: 'hPa', rain: 'mm', ws: 'm/s', wg: 'm/s', sr: 'W/m²', uv: 'UV' };
 
-export function aggregateCustomRange(data, variables) {
-    // 1. Zoskupenie dát podľa dní
-    const dailyDataMap = new Map();
+// Definuje, akú metódu použiť pre hlavnú krivku v grafe
+const AGGREGATION_METHOD = {
+    temp: 'avg', hum: 'avg', press: 'avg', ws: 'avg', // Priemerované
+    wg: 'max', rain: 'sum', sr: 'max', uv: 'max'      // Maximá alebo súčty
+};
+
+// Pomocná funkcia na získanie kľúča pre zoskupenie (hodina, deň, týždeň)
+function getGroupKey(timestamp, granularity) {
+    const date = new Date(timestamp);
+    if (granularity === 'hourly') {
+        return date.setMinutes(0, 0, 0); // Vráti timestamp zaokrúhlený na hodinu
+    }
+    if (granularity === 'weekly') {
+        const day = date.getDay();
+        const diff = date.getDate() - day + (day === 0 ? -6 : 1); // Začiatok týždňa (pondelok)
+        return new Date(date.setDate(diff)).setHours(0, 0, 0, 0);
+    }
+    // 'daily' je predvolené
+    return date.setHours(0, 0, 0, 0);
+}
+
+export function aggregateCustomRange(data, variables, rangeInDays) {
+    // 1. Určenie granularity na základe dĺžky obdobia
+    let granularity;
+    if (rangeInDays <= 1) granularity = 'hourly';
+    else if (rangeInDays > 90) granularity = 'weekly';
+    else granularity = 'daily';
+
+    // 2. Zoskupenie dát do časových "segmentov" (hodín, dní, týždňov)
+    const groupedData = new Map();
     data.forEach(item => {
-        const day = formatTimestampToLocalDate(item.t);
-        if (!dailyDataMap.has(day)) dailyDataMap.set(day, {});
-        
-        variables.forEach(variable => {
-            if (!dailyDataMap.get(day)[variable]) dailyDataMap.get(day)[variable] = [];
-            dailyDataMap.get(day)[variable].push(item[variable]);
-        });
+        const key = getGroupKey(item.t, granularity);
+        if (!groupedData.has(key)) groupedData.set(key, []);
+        groupedData.get(key).push(item);
     });
 
-    // 2. Výpočet denných hodnôt pre graf
-    const dailyData = [];
-    Array.from(dailyDataMap.keys()).sort().forEach(day => {
-        const dayValues = {};
+    // 3. Výpočet min/avg/max pre každý segment a premennú
+    const aggregatedPeriods = [];
+    Array.from(groupedData.keys()).sort((a,b) => a-b).forEach(key => {
+        const periodItems = groupedData.get(key);
+        const periodResult = { timestamp: key, values: {} };
+
         variables.forEach(variable => {
-            const values = dailyDataMap.get(day)[variable].filter(v => v !== null);
+            const values = periodItems.map(item => item[variable]).filter(v => v !== null);
             if (values.length === 0) {
-                dayValues[variable] = null;
+                periodResult.values[variable] = { min: null, avg: null, max: null, sum: null };
                 return;
             }
-            if (variable === 'rain') {
-                dayValues[variable] = Math.max(...values) - Math.min(...values);
-            } else {
-                dayValues[variable] = values.reduce((a, b) => a + b, 0) / values.length;
-            }
+            
+            const sum = values.reduce((a, b) => a + b, 0);
+            periodResult.values[variable] = {
+                min: Math.min(...values),
+                avg: sum / values.length,
+                max: Math.max(...values),
+                sum: sum
+            };
         });
-        dailyData.push({ date: day, values: dayValues });
+        aggregatedPeriods.push(periodResult);
     });
 
-    // 3. Výpočet celkových štatistík pre boxy
+    // 4. Výpočet celkových štatistík pre boxy
     const summaries = {};
     variables.forEach(variable => {
         const allItems = data.filter(item => item[variable] !== null);
         if (allItems.length === 0) {
-            summaries[variable] = { max: null, min: null, avg: null, maxTime: null, minTime: null };
+            summaries[variable] = { max: null, min: null, avg: null, total: null };
             return;
         }
 
-        if (variable === 'rain') {
-            const dailyTotals = dailyData.map(d => d.values.rain).filter(v => v !== null);
-            if (dailyTotals.length > 0) {
-                const maxDay = Math.max(...dailyTotals);
-                const maxDayIndex = dailyTotals.indexOf(maxDay);
-                summaries[variable] = {
-                    total: dailyTotals.reduce((a, b) => a + b, 0),
-                    max: maxDay,
-                    maxTime: new Date(dailyData[maxDayIndex].date).getTime(),
-                    avg: dailyTotals.reduce((a, b) => a + b, 0) / dailyTotals.length,
-                };
-            }
+        const allValues = allItems.map(item => item[variable]);
+        const maxVal = Math.max(...allValues);
+        
+        let minVal;
+        if (variable === 'ws' || variable === 'wg') {
+            const nonZeroValues = allValues.filter(v => v > 0);
+            minVal = nonZeroValues.length > 0 ? Math.min(...nonZeroValues) : null;
         } else {
-            const allValues = allItems.map(item => item[variable]);
-            const maxVal = Math.max(...allValues);
-            
-            // =======================================================
-            // KĽÚČOVÁ ZMENA: Nájdenie minima väčšieho ako nula pre vietor
-            // =======================================================
-            let minVal;
-            if (variable === 'ws' || variable === 'wg') {
-                const nonZeroValues = allValues.filter(v => v > 0);
-                minVal = nonZeroValues.length > 0 ? Math.min(...nonZeroValues) : null;
-            } else {
-                minVal = Math.min(...allValues);
-            }
-            // =======================================================
-
-            summaries[variable] = {
-                max: maxVal,
-                min: minVal,
-                avg: allValues.reduce((a, b) => a + b, 0) / allValues.length,
-                maxTime: allItems.find(item => item[variable] === maxVal)?.t,
-                minTime: minVal !== null ? allItems.find(item => item[variable] === minVal)?.t : null,
-                unit: UNITS[variable]
-            };
+            minVal = Math.min(...allValues);
         }
+
+        summaries[variable] = {
+            max: maxVal,
+            min: minVal,
+            avg: allValues.reduce((a, b) => a + b, 0) / allValues.length,
+            total: variable === 'rain' ? aggregatedPeriods.reduce((acc, p) => acc + (p.values.rain?.sum || 0), 0) : null,
+            maxTime: allItems.find(item => item[variable] === maxVal)?.t,
+            minTime: minVal !== null ? allItems.find(item => item[variable] === minVal)?.t : null,
+            unit: UNITS[variable]
+        };
     });
     
-    return { dailyData, summaries };
+    return { aggregatedPeriods, summaries, granularity, aggregationMethod: AGGREGATION_METHOD };
 }
