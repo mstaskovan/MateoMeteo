@@ -101,49 +101,66 @@ function calculateOverallSummary(items) {
 }
 
 /**
- * Pomocná funkcia na výpočet prírastkov zrážok
+ * FINÁLNA VERZIA: Pomocná funkcia na výpočet prírastkov zrážok,
+ * ktorá správne ošetruje NULL hodnoty (výpadky dát).
  */
 function calculateRainIncrements(data) {
     const sortedData = [...data].sort((a, b) => a.t - b.t);
     const rainIncrements = new Map();
+    let lastValidRain = null;
 
-    for (let i = 1; i < sortedData.length; i++) {
-        const prev = sortedData[i - 1];
+    for (let i = 0; i < sortedData.length; i++) {
         const curr = sortedData[i];
         
-        // Spracujeme len platné dáta
-        if (prev.rain === null || curr.rain === null) continue;
-        
-        // Kontrola resetu (current < prev) alebo normálneho prírastku
-        const increment = curr.rain < prev.rain ? curr.rain : curr.rain - prev.rain;
+        if (curr.rain === null || typeof curr.rain === 'undefined') {
+            continue; // Preskočíme neplatné/chýbajúce záznamy
+        }
+
+        // Ak je to prvý platný záznam, ktorý nájdeme
+        if (lastValidRain === null) {
+            lastValidRain = curr.rain;
+            // Prvý záznam dňa (alebo po sérii null) môže sám o sebe predstavovať prírastok (ak bol reset o polnoci)
+            if (curr.rain > 0) {
+                 rainIncrements.set(curr.t, curr.rain);
+            }
+            continue;
+        }
+
+        // Máme predchádzajúcu platnú hodnotu, môžeme porovnávať
+        const increment = curr.rain < lastValidRain ? curr.rain : curr.rain - lastValidRain;
         
         if (increment > 0) {
             rainIncrements.set(curr.t, increment);
         }
+        
+        // Aktualizujeme poslednú platnú hodnotu pre ďalšiu iteráciu
+        lastValidRain = curr.rain;
     }
     return rainIncrements;
 }
+
 
 export function aggregateHourlyData(data, rawDate) {
     const filteredData = data.filter(item => formatTimestampToLocalDate(item.t) === rawDate);
     if (filteredData.length === 0) return { data: [], mode: 'hourly', summary: null };
 
+    // Dátové položky, ktoré majú platné dáta pre súhrn (napr. temp)
     const validItemsForSummary = filteredData.filter(item => item.temp !== null && item.hum !== null);
     const summary = calculateOverallSummary(validItemsForSummary);
     
-    // --- LOGIKA VÝPOČTU ZRÁŽOK ---
+    // --- Vypočítame prírastky zrážok pre celý deň ---
     const rainIncrements = calculateRainIncrements(filteredData);
-    // --- KONIEC LOGIKY ---
 
     const hourlyDataMap = new Map();
+    // Zoskupíme len platné položky (tie, čo nie sú null)
     filteredData.forEach(item => { 
+        if (item.temp === null) return; // Preskočíme riadky, kde sú všetky dáta null
+        
         const hourKey = (new Date(item.t).getUTCHours() + LOCAL_OFFSET_HOURS) % 24; 
         if (!hourlyDataMap.has(hourKey)) {
             hourlyDataMap.set(hourKey, { rawItems: [] });
         }
-        if (item.temp !== null) { // Pridávame len platné záznamy
-            hourlyDataMap.get(hourKey).rawItems.push(item); 
-        }
+        hourlyDataMap.get(hourKey).rawItems.push(item); 
     });
     
     const aggregatedData = [];
@@ -155,15 +172,20 @@ export function aggregateHourlyData(data, rawDate) {
     for (let hourKey = 0; hourKey < 24; hourKey++) {
         const record = hourlyDataMap.get(hourKey);
         
-        // Spočítame Temp, Hum, atď. len ak máme dáta
-        const hourSummary = record ? calculateOverallSummary(record.rawItems) : {};
+        // Spočítame Temp, Hum, atď. len ak máme dáta (record nie je undefined)
+        const hourSummary = (record && record.rawItems.length > 0) 
+            ? calculateOverallSummary(record.rawItems) 
+            : {}; // Bezpečný fallback pre prázdne hodiny
 
         // Sčítame 10-min prírastky, ktoré patria do tejto hodiny
         let hourRainTotal = 0;
+        
+        // Získame všetky timestampy (aj z null riadkov), ktoré patria do tejto hodiny
         const timestampsInThisHour = filteredData
             .filter(item => ((new Date(item.t).getUTCHours() + LOCAL_OFFSET_HOURS) % 24) === hourKey)
             .map(item => item.t);
 
+        // Sčítame prírastky, ktoré sa udiali v tejto hodine
         timestampsInThisHour.forEach(t => {
             if (rainIncrements.has(t)) {
                 hourRainTotal += rainIncrements.get(t);
@@ -174,10 +196,12 @@ export function aggregateHourlyData(data, rawDate) {
         totalRainSum += hourRainTotal;
         if (hourRainTotal > maxHourlyRain) {
             maxHourlyRain = hourRainTotal;
+            
+            // OPRAVA CHYBY: Vytvoríme čas na základe rawDate a hourKey, nie z 'record'
             const dateForHour = new Date(`${rawDate}T00:00:00Z`); // Začíname o polnoci UTC
-            // Prirátame hodinu a UTC offset
-            dateForHour.setUTCHours(hourKey - LOCAL_OFFSET_HOURS, 0, 0, 0);
-            maxHourlyRainTime = dateForHour.getTime();
+            // Prirátame hodinu a UTC offset, aby sme dostali správny lokálny čas
+            dateForHour.setUTCHours(hourKey, 0, 0, 0);
+            maxHourlyRainTime = dateForHour.getTime() - (LOCAL_OFFSET_HOURS * 60 * 60 * 1000);
         }
         
         aggregatedData.push({ 
@@ -216,9 +240,12 @@ export function aggregateDailyData(data, selectedMonth) {
     filteredData.forEach(item => { 
         const dayKey = formatTimestampToLocalDate(item.t); 
         if (!dailyDataMap.has(dayKey)) {
-            dailyDataMap.set(dayKey, { day: dayKey.split('-')[2], rawItems: [] }); 
+            dailyDataMap.set(dayKey, { day: dayKey.split('-')[2], rawItems: [], allItems: [] }); 
         }
-        if (item.temp !== null) { // Pridávame len platné záznamy
+        // Uložíme všetky položky dňa pre výpočet zrážok
+        dailyDataMap.get(dayKey).allItems.push(item);
+        
+        if (item.temp !== null) { // Pridávame len platné záznamy pre súhrn
             dailyDataMap.get(dayKey).rawItems.push(item); 
         }
     });
@@ -230,14 +257,11 @@ export function aggregateDailyData(data, selectedMonth) {
         const record = dailyDataMap.get(dayKey);
         const daySummary = calculateOverallSummary(record.rawItems);
         
+        // Sčítame 10-min prírastky, ktoré patria do tohto dňa
         let dayRainTotal = 0;
-        const timestampsInThisDay = filteredData
-            .filter(item => formatTimestampToLocalDate(item.t) === dayKey)
-            .map(item => item.t);
-
-        timestampsInThisDay.forEach(t => {
-            if (rainIncrements.has(t)) {
-                dayRainTotal += rainIncrements.get(t);
+        record.allItems.forEach(item => {
+            if (rainIncrements.has(item.t)) {
+                dayRainTotal += rainIncrements.get(item.t);
             }
         });
         dayRainTotal = Math.round(dayRainTotal * 10) / 10;
