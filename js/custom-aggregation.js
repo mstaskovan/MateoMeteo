@@ -5,30 +5,31 @@ const UNITS = { temp: '°C', hum: '%', press: 'hPa', rain: 'mm', ws: 'm/s', wg: 
 const AGGREGATION_METHOD = { temp: 'avg', hum: 'avg', press: 'avg', ws: 'avg', wg: 'max', rain: 'sum', sr: 'max', uv: 'max' };
 
 /**
- * ZDIELANÁ POMOCNÁ FUNKCIA: Presne vypočíta súčet prírastkov zrážok.
- * @param {Array} items Pole dátových záznamov.
- * @returns {number} Celkový súčet zrážok.
+ * Pomocná funkcia na výpočet prírastkov zrážok
  */
-function calculateRainIncrementSum(items) {
-    if (items.length < 2) return 0;
+function calculateRainIncrements(items) {
     const sortedItems = [...items].sort((a, b) => a.t - b.t);
-    let rainSum = 0;
+    const rainIncrements = new Map();
+
     for (let i = 1; i < sortedItems.length; i++) {
-        const prevRain = sortedItems[i - 1].rain;
-        const currentRain = sortedItems[i].rain;
-        if (prevRain === null || currentRain === null) continue;
-        const increment = currentRain < prevRain ? currentRain : currentRain - prevRain;
+        const prev = sortedItems[i - 1];
+        const curr = sortedItems[i];
+
+        if (prev.rain === null || curr.rain === null) continue;
+
+        // Kontrola resetu (current < prev) alebo normálneho prírastku
+        // Táto logika správne spracuje aj veľké medzery
+        const increment = curr.rain < prev.rain ? curr.rain : curr.rain - prev.rain;
+
         if (increment > 0) {
-            rainSum += increment;
+            rainIncrements.set(curr.t, increment);
         }
     }
-    return rainSum;
+    return rainIncrements;
 }
 
 /**
  * ZDIELANÁ POMOCNÁ FUNKCIA: Určí najčastejší smer vetra.
- * @param {Array} items Pole dátových záznamov.
- * @returns {number|null} Prevažujúci smer vetra v stupňoch.
  */
 function calculateWindMode(items) {
     const wdCounts = new Map();
@@ -62,26 +63,57 @@ export function aggregateCustomRange(data, variables, rangeInDays) {
     else if (rangeInDays > 90) granularity = 'weekly';
     else granularity = 'daily';
 
+    // --- LOGIKA VÝPOČTU ZRÁŽOK ---
+    const rainIncrements = calculateRainIncrements(data);
+    let totalRainSum = 0;
+    rainIncrements.forEach(inc => totalRainSum += inc);
+    totalRainSum = Math.round(totalRainSum * 10) / 10;
+    // --- KONIEC LOGIKY ---
+
     const groupedData = new Map();
     data.forEach(item => {
         const key = getGroupKey(item.t, granularity);
         if (!groupedData.has(key)) groupedData.set(key, []);
-        groupedData.get(key).push(item);
+        // Pridáme len položky, ktoré majú dáta (pre ostatné metriky)
+        if (item.temp !== null) {
+            groupedData.get(key).push(item);
+        }
     });
 
     const aggregatedPeriods = [];
     Array.from(groupedData.keys()).sort((a, b) => a - b).forEach(key => {
-        const periodItems = groupedData.get(key);
+        const periodItems = groupedData.get(key); // Items s platnými dátami
         const periodResult = { timestamp: key, values: {} };
+        
+        // Získame VŠETKY položky (vrátane null) len pre zistenie timestampov
+        const allPeriodItems = data.filter(item => getGroupKey(item.t, granularity) === key);
+
         variables.forEach(variable => {
             const values = periodItems.map(item => item[variable]).filter(v => v !== null);
-            if (values.length === 0) {
+            if (values.length === 0 && variable !== 'rain') {
                 periodResult.values[variable] = { min: null, avg: null, max: null, sum: null };
                 return;
             }
-            // UPRAVENÁ LOGIKA PRE ZRÁŽKY V RÁMCI PERIÓDY
-            const sum = variable === 'rain' ? calculateRainIncrementSum(periodItems) : values.reduce((a, b) => a + b, 0);
-            periodResult.values[variable] = { min: Math.min(...values), avg: sum / values.length, max: Math.max(...values), sum: sum };
+
+            let sum;
+            if (variable === 'rain') {
+                let periodRainSum = 0;
+                allPeriodItems.forEach(item => {
+                    if (rainIncrements.has(item.t)) {
+                        periodRainSum += rainIncrements.get(item.t);
+                    }
+                });
+                sum = Math.round(periodRainSum * 10) / 10;
+            } else {
+                sum = values.reduce((a, b) => a + b, 0);
+            }
+            
+            periodResult.values[variable] = { 
+                min: values.length > 0 ? Math.min(...values) : null, 
+                avg: (variable !== 'rain' && values.length > 0) ? sum / values.length : null, 
+                max: values.length > 0 ? Math.max(...values) : null, 
+                sum: sum 
+            };
         });
         aggregatedPeriods.push(periodResult);
     });
@@ -105,24 +137,26 @@ export function aggregateCustomRange(data, variables, rangeInDays) {
     const summaries = {};
     variables.forEach(variable => {
         const allItems = data.filter(item => item[variable] !== null);
-        if (allItems.length === 0) {
-            summaries[variable] = { max: null, min: null, avg: null, total: null, wdMode: null };
-            return;
-        }
-
+        
         if (variable === 'rain') {
-            const dailyTotals = aggregatedPeriods.map(d => d.values.rain?.sum).filter(v => v !== null && v !== undefined);
-            if (dailyTotals.length > 0) {
-                const maxDay = Math.max(...dailyTotals);
-                const maxDayIndex = dailyTotals.indexOf(maxDay);
+            const periodTotals = aggregatedPeriods.map(d => d.values.rain?.sum).filter(v => v !== null && v !== undefined);
+            if (periodTotals.length > 0) {
+                const maxPeriod = Math.max(...periodTotals);
+                const maxPeriodIndex = periodTotals.indexOf(maxPeriod);
                 summaries[variable] = {
-                    total: calculateRainIncrementSum(allItems), // Presný celkový súčet
-                    max: maxDay,
-                    maxTime: aggregatedPeriods[maxDayIndex]?.timestamp,
-                    avg: dailyTotals.reduce((a, b) => a + b, 0) / dailyTotals.length,
+                    total: totalRainSum, 
+                    max: maxPeriod,
+                    maxTime: aggregatedPeriods[maxPeriodIndex]?.timestamp,
+                    avg: totalRainSum / periodTotals.length,
                 };
+            } else {
+                 summaries[variable] = { max: null, avg: null, total: totalRainSum };
             }
         } else {
+             if (allItems.length === 0) {
+                summaries[variable] = { max: null, min: null, avg: null, total: null, wdMode: null };
+                return;
+            }
             const allValues = allItems.map(item => item[variable]);
             const maxVal = Math.max(...allValues);
             
