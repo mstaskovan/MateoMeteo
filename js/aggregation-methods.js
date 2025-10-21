@@ -28,11 +28,42 @@ function calculateWindMode(items) {
 }
 
 /**
+ * POMOCNÁ FUNKCIA: Presne vypočíta súčet prírastkov zrážok.
+ * Prevzaté z custom-aggregation.js pre zjednotenie logiky.
+ */
+function calculateRainIncrementSum(items) {
+    if (items.length < 2) return 0;
+    // Triedime, aby sme mali istotu správneho poradia pre výpočet rozdielu
+    const sortedItems = [...items].sort((a, b) => a.t - b.t);
+    let rainSum = 0;
+    
+    for (let i = 1; i < sortedItems.length; i++) {
+        const prevRain = sortedItems[i - 1].rain;
+        const currentRain = sortedItems[i].rain;
+        
+        if (prevRain === null || currentRain === null) continue;
+        
+        // Ak je aktuálna hodnota nižšia, znamená to reset počítadla (napr. o polnoci)
+        // v takom prípade je prírastok samotná aktuálna hodnota.
+        const increment = currentRain < prevRain ? currentRain : currentRain - prevRain;
+        
+        if (increment > 0) {
+            rainSum += increment;
+        }
+    }
+    // Zaokrúhlenie na jedno desatinné miesto pre konzistenciu
+    return Math.round(rainSum * 10) / 10;
+}
+
+
+/**
  * Hlavná funkcia pre výpočet súhrnných štatistík pre dané obdobie.
  */
 function calculateOverallSummary(items) {
     if (items.length === 0) return null;
-    const metrics = { temp: { sum: 0, count: 0, max: -Infinity, min: Infinity, maxT: null, minT: null }, hum: { sum: 0, count: 0, max: -Infinity, min: Infinity, maxT: null, minT: null }, press: { sum: 0, count: 0, max: -Infinity, min: Infinity, maxT: null, minT: null }, ws: { sum: 0, count: 0, max: -Infinity, maxT: null }, wg: { min: Infinity, minT: null, max: -Infinity, maxT: null }, rain: { min: Infinity, max: -Infinity }, sr: { sum: 0, count: 0, max: -Infinity, maxT: null }, uv: { sum: 0, count: 0, max: -Infinity, maxT: null } };
+    
+    // UPRAVENÉ: Odstránená premenná 'rain' z 'metrics'
+    const metrics = { temp: { sum: 0, count: 0, max: -Infinity, min: Infinity, maxT: null, minT: null }, hum: { sum: 0, count: 0, max: -Infinity, min: Infinity, maxT: null, minT: null }, press: { sum: 0, count: 0, max: -Infinity, min: Infinity, maxT: null, minT: null }, ws: { sum: 0, count: 0, max: -Infinity, maxT: null }, wg: { min: Infinity, minT: null, max: -Infinity, maxT: null }, sr: { sum: 0, count: 0, max: -Infinity, maxT: null }, uv: { sum: 0, count: 0, max: -Infinity, maxT: null } };
     
     items.forEach(item => {
         const t = item.t;
@@ -53,10 +84,9 @@ function calculateOverallSummary(items) {
             if (item.wg > metrics.wg.max) { metrics.wg.max = item.wg; metrics.wg.maxT = t; }
             if (item.wg > 0 && item.wg < metrics.wg.min) { metrics.wg.min = item.wg; metrics.wg.minT = t; }
         }
-        if (item.rain !== null) {
-            metrics.rain.min = Math.min(metrics.rain.min, item.rain);
-            metrics.rain.max = Math.max(metrics.rain.max, item.rain);
-        }
+        
+        // ODSTRÁNENÉ: Pôvodný 'if' blok pre 'rain' bol tu
+
         if (item.sr !== null) {
             metrics.sr.sum += item.sr;
             metrics.sr.count++;
@@ -92,7 +122,10 @@ function calculateOverallSummary(items) {
         wgMaxTime: metrics.wg.maxT,
         wgMin: metrics.wg.min !== Infinity ? metrics.wg.min : null,
         wgMinTime: metrics.wg.minT,
-        rainTotal: (metrics.rain.max !== -Infinity) ? metrics.rain.max - metrics.rain.min : null,
+        
+        // UPRAVENÉ: Používa sa nová, správna funkcia
+        rainTotal: calculateRainIncrementSum(items),
+        
         srAvg: metrics.sr.count > 0 ? metrics.sr.sum / metrics.sr.count : null,
         srMax: metrics.sr.max !== -Infinity ? metrics.sr.max : null,
         srMaxTime: metrics.sr.maxT,
@@ -120,6 +153,8 @@ export function aggregateHourlyData(data, rawDate) {
     Array.from(hourlyDataMap.keys()).sort((a, b) => a - b).forEach(hourKey => {
         const record = hourlyDataMap.get(hourKey);
         const hourSummary = calculateOverallSummary(record.rawItems);
+        
+        // Tu sa 'rainTotal' berie už zo správne vypočítaného 'hourSummary'
         if (hourSummary.rainTotal !== null) {
             totalRainSum += hourSummary.rainTotal;
             if (hourSummary.rainTotal > maxHourlyRain) {
@@ -152,6 +187,7 @@ export function aggregateDailyData(data, selectedMonth) {
     const aggregatedData = [];
     Array.from(dailyDataMap.keys()).sort().forEach(dayKey => {
         const daySummary = calculateOverallSummary(dailyDataMap.get(dayKey).rawItems);
+        // Tu sa 'rainTotal' berie už zo správne vypočítaného 'daySummary'
         if (daySummary.rainTotal !== null) totalRainSum += daySummary.rainTotal;
         aggregatedData.push({ day: dailyDataMap.get(dayKey).day, tempAvg: daySummary.tempAvg, humAvg: daySummary.humAvg, pressAvg: daySummary.pressAvg, wsAvg: daySummary.wsAvg, wgMax: daySummary.wgMax, wdMode: daySummary.wdMode, rainTotal: daySummary.rainTotal, srAvg: daySummary.srAvg, uvAvg: daySummary.uvAvg, });
     });
