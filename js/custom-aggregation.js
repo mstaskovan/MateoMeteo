@@ -5,25 +5,40 @@ const UNITS = { temp: '°C', hum: '%', press: 'hPa', rain: 'mm', ws: 'm/s', wg: 
 const AGGREGATION_METHOD = { temp: 'avg', hum: 'avg', press: 'avg', ws: 'avg', wg: 'max', rain: 'sum', sr: 'max', uv: 'max' };
 
 /**
- * Pomocná funkcia na výpočet prírastkov zrážok
+ * FINÁLNA VERZIA: Pomocná funkcia na výpočet prírastkov zrážok,
+ * ktorá správne ošetruje NULL hodnoty (výpadky dát).
  */
 function calculateRainIncrements(items) {
     const sortedItems = [...items].sort((a, b) => a.t - b.t);
     const rainIncrements = new Map();
+    let lastValidRain = null;
 
-    for (let i = 1; i < sortedItems.length; i++) {
-        const prev = sortedItems[i - 1];
+    for (let i = 0; i < sortedItems.length; i++) {
         const curr = sortedItems[i];
+        
+        if (curr.rain === null || typeof curr.rain === 'undefined') {
+            continue; // Preskočíme neplatné/chýbajúce záznamy
+        }
 
-        if (prev.rain === null || curr.rain === null) continue;
+        // Ak je to prvý platný záznam, ktorý nájdeme
+        if (lastValidRain === null) {
+            lastValidRain = curr.rain;
+            // Prvý záznam dňa (alebo po sérii null) môže sám o sebe predstavovať prírastok (ak bol reset o polnoci)
+            if (curr.rain > 0) {
+                 rainIncrements.set(curr.t, curr.rain);
+            }
+            continue;
+        }
 
-        // Kontrola resetu (current < prev) alebo normálneho prírastku
-        // Táto logika správne spracuje aj veľké medzery
-        const increment = curr.rain < prev.rain ? curr.rain : curr.rain - prev.rain;
-
+        // Máme predchádzajúcu platnú hodnotu, môžeme porovnávať
+        const increment = curr.rain < lastValidRain ? curr.rain : curr.rain - lastValidRain;
+        
         if (increment > 0) {
             rainIncrements.set(curr.t, increment);
         }
+        
+        // Aktualizujeme poslednú platnú hodnotu pre ďalšiu iteráciu
+        lastValidRain = curr.rain;
     }
     return rainIncrements;
 }
