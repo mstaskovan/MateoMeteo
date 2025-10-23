@@ -85,30 +85,5 @@ h1, h2 { color: var(--heading-color); text-align: center; }
     .hamburger.active .bar:nth-child(3) { transform: translateY(-8px) rotate(-45deg); }
     .control-panel, .control-panel.analysis-panel { grid-template-columns: 1fr; }
     
-    /* ======================================================= */
-    /* Vylepšenie: Prilepená hlavička pre mobilné tabuľky */
-    /* ======================================================= */
-    #json-data table {
-        /* Dôležité pre kontext z-indexu */
-        position: relative; 
-    }
-    
-    #json-data thead { 
-        /* Prilepíme celý <thead/> */
-        position: -webkit-sticky; 
-        position: sticky;
-        top: 70px; /* Pozícia POD navigačnou lištou */
-        /* Vyšší z-index, aby bola hlavička nad obsahom tela tabuľky */
-        z-index: 11; 
-    }
-
-    #json-data thead th {
-        /* === OPRAVA FARBY POZADIA === */
-        /* Použijeme farbu pozadia kontajnera pre tmavú tému */
-        background-color: var(--container-bg); 
-        
-        /* Znovu definujeme spodný okraj, aby bol viditeľný */
-        border-bottom: 2px solid var(--heading-color); 
-    }
-    /* === KONIEC Vylepšenia === */
+}
 
