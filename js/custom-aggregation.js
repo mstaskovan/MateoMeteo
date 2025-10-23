@@ -1,242 +1,169 @@
 // js/custom-aggregation.js
+import { formatTimestampToLocalDate } from './utils.js';
 
-// ***** TOTO JE OPRAVENÝ RIADOK 1 *****
-import { getStartOfHour, getStartOfDay, getStartOfWeek } from './utils.js';
+const UNITS = { temp: '°C', hum: '%', press: 'hPa', rain: 'mm', ws: 'm/s', wg: 'm/s', sr: 'W/m²', uv: 'UV' };
+const AGGREGATION_METHOD = { temp: 'avg', hum: 'avg', press: 'avg', ws: 'avg', wg: 'max', rain: 'sum', sr: 'max', uv: 'max' };
 
-// Helper funkcia pre agregáciu dát do hodinových blokov
-function aggregateByHour(data, variables) {
-    const hourlyData = new Map();
+/**
+ * FINÁLNA VERZIA: Pomocná funkcia na výpočet prírastkov zrážok,
+ * ktorá správne ošetruje NULL hodnoty (výpadky dát).
+ */
+function calculateRainIncrements(items) {
+    const sortedItems = [...items].sort((a, b) => a.t - b.t);
+    const rainIncrements = new Map();
+    let lastValidRain = null;
 
-    for (const record of data) {
-        const timestamp = getStartOfHour(record.timestamp).getTime();
-
-        if (!hourlyData.has(timestamp)) {
-            hourlyData.set(timestamp, { timestamp: timestamp, values: {} });
+    for (let i = 0; i < sortedItems.length; i++) {
+        const curr = sortedItems[i];
+        
+        if (curr.rain === null || typeof curr.rain === 'undefined') {
+            continue; // Preskočíme neplatné/chýbajúce záznamy
         }
-        const hourData = hourlyData.get(timestamp);
 
-        for (const variable of variables) {
-            if (record[variable] !== null && record[variable] !== undefined) {
-                if (!hourData.values[variable]) {
-                    hourData.values[variable] = { sum: 0, count: 0, min: Infinity, max: -Infinity };
-                }
-                const stats = hourData.values[variable];
-                stats.sum += record[variable];
-                stats.count++;
-                if (record[variable] < stats.min) stats.min = record[variable];
-                if (record[variable] > stats.max) stats.max = record[variable];
+        // Ak je to prvý platný záznam, ktorý nájdeme
+        if (lastValidRain === null) {
+            lastValidRain = curr.rain;
+            // Prvý záznam dňa (alebo po sérii null) môže sám o sebe predstavovať prírastok (ak bol reset o polnoci)
+            if (curr.rain > 0) {
+                 rainIncrements.set(curr.t, curr.rain);
             }
+            continue;
         }
+
+        // Máme predchádzajúcu platnú hodnotu, môžeme porovnávať
+        const increment = curr.rain < lastValidRain ? curr.rain : curr.rain - lastValidRain;
+        
+        if (increment > 0) {
+            rainIncrements.set(curr.t, increment);
+        }
+        
+        // Aktualizujeme poslednú platnú hodnotu pre ďalšiu iteráciu
+        lastValidRain = curr.rain;
     }
-
-    return Array.from(hourlyData.values()).sort((a, b) => a.timestamp - b.timestamp);
-}
-
-// Helper funkcia pre agregáciu dát do denných blokov
-function aggregateByDay(data, variables) {
-    const dailyData = new Map();
-
-    for (const record of data) {
-        const timestamp = getStartOfDay(record.timestamp).getTime();
-
-        if (!dailyData.has(timestamp)) {
-            dailyData.set(timestamp, { timestamp: timestamp, values: {} });
-        }
-        const dayData = dailyData.get(timestamp);
-
-        for (const variable of variables) {
-            if (record[variable] !== null && record[variable] !== undefined) {
-                if (!dayData.values[variable]) {
-                    dayData.values[variable] = { sum: 0, count: 0, min: Infinity, max: -Infinity };
-                }
-                const stats = dayData.values[variable];
-                stats.sum += record[variable];
-                stats.count++;
-                if (record[variable] < stats.min) stats.min = record[variable];
-                if (record[variable] > stats.max) stats.max = record[variable];
-            }
-        }
-    }
-    
-    return Array.from(dailyData.values()).sort((a, b) => a.timestamp - b.timestamp);
-}
-
-// Helper funkcia pre agregáciu dát do týždenných blokov
-function aggregateByWeek(data, variables) {
-    const weeklyData = new Map();
-
-    for (const record of data) {
-        const timestamp = getStartOfWeek(record.timestamp).getTime();
-
-        if (!weeklyData.has(timestamp)) {
-            weeklyData.set(timestamp, { timestamp: timestamp, values: {} });
-        }
-        const weekData = weeklyData.get(timestamp);
-
-        for (const variable of variables) {
-            if (record[variable] !== null && record[variable] !== undefined) {
-                if (!weekData.values[variable]) {
-                    weekData.values[variable] = { sum: 0, count: 0, min: Infinity, max: -Infinity };
-                }
-                const stats = weekData.values[variable];
-                stats.sum += record[variable];
-                stats.count++;
-                if (record[variable] < stats.min) stats.min = record[variable];
-                if (record[variable] > stats.max) stats.max = record[variable];
-            }
-        }
-    }
-    
-    return Array.from(weeklyData.values()).sort((a, b) => a.timestamp - b.timestamp);
+    return rainIncrements;
 }
 
 /**
- * Agreguje dáta (zo servera) a počíta súhrnné štatistiky.
- * @param {Array} data - Surové dáta z `data-loader.js` (objekty s 't', 'temp', 'hum'...)
- * @param {Array} variables - Polia premenných (napr. ['temp', 'rain'])
- * @param {number} rangeInDays - Počet dní v rozsahu
- * @returns {Object} - { aggregatedPeriods, summaries, granularity, windRoseData, aggregationMethod }
+ * ZDIELANÁ POMOCNÁ FUNKCIA: Určí najčastejší smer vetra.
  */
-export function aggregateCustomRange(data, variables, rangeInDays) {
-    
-    let granularity;
-    if (rangeInDays <= 2) {
-        granularity = 'hourly';
-    } else if (rangeInDays > 90) {
-        granularity = 'weekly';
-    } else {
-        granularity = 'daily';
-    }
+function calculateWindMode(items) {
+    const wdCounts = new Map();
+    const MIN_WIND_SPEED_FILTER = 1.0;
+    items.forEach(item => {
+        if (item.ws !== null && item.ws >= MIN_WIND_SPEED_FILTER && item.wd !== null) {
+            wdCounts.set(item.wd, (wdCounts.get(item.wd) || 0) + 1);
+        }
+    });
+    let modeWD = null, maxCount = 0;
+    wdCounts.forEach((count, wd) => { if (count > maxCount) { maxCount = count; modeWD = wd; } });
+    return modeWD;
+}
 
-    let aggregationFunction;
+// TÁTO FUNKCIA JE Z VÁŠHO PÔVODNÉHO SÚBORU A JE SPRÁVNA
+function getGroupKey(timestamp, granularity) {
+    const date = new Date(timestamp);
     if (granularity === 'hourly') {
-        aggregationFunction = aggregateByHour;
-    } else if (granularity === 'daily') {
-        aggregationFunction = aggregateByDay;
-    } else { // 'weekly'
-        aggregationFunction = aggregateByWeek;
+        return date.setMinutes(0, 0, 0);
     }
+    if (granularity === 'weekly') {
+        const day = date.getDay();
+        const diff = date.getDate() - day + (day === 0 ? -6 : 1);
+        return new Date(date.setDate(diff)).setHours(0, 0, 0, 0);
+    }
+    return date.setHours(0, 0, 0, 0);
+}
 
-    // 1. Výpočet prírastkov zrážok (rain_increment)
-    // Toto je špeciálna logika len pre zrážky, keďže 'rain' je kumulatívny
-    let lastRainValue = null;
+export function aggregateCustomRange(data, variables, rangeInDays) {
+    let granularity;
+    if (rangeInDays <= 1) granularity = 'hourly';
+    else if (rangeInDays > 90) granularity = 'weekly';
+    else granularity = 'daily';
+
+    // --- LOGIKA VÝPOČTU ZRÁŽOK (Pôvodná, je správna) ---
+    const rainIncrements = calculateRainIncrements(data);
     let totalRainSum = 0;
-    const rainIncrements = new Map(); // Map<timestamp, increment>
+    rainIncrements.forEach(inc => totalRainSum += inc);
+    totalRainSum = Math.round(totalRainSum * 10) / 10;
+    // --- KONIEC LOGIKY ---
 
-    for (const record of data) {
-        // 't' je timestamp
-        if (record.rain !== null && record.rain !== undefined) {
-            if (lastRainValue !== null) {
-                let increment = record.rain - lastRainValue;
-                if (increment < 0) {
-                    // Reset počítadla (o polnoci alebo pri reštarte stanice)
-                    increment = record.rain; 
-                }
-                if (increment > 0) {
-                    totalRainSum += increment;
-                    // Uložíme prírastok k presnému timestampu záznamu
-                    rainIncrements.set(record.t, increment);
-                }
-            }
-            lastRainValue = record.rain;
+    const groupedData = new Map();
+    data.forEach(item => {
+        const key = getGroupKey(item.t, granularity);
+        if (!groupedData.has(key)) groupedData.set(key, []);
+        // Pridáme len položky, ktoré majú dáta (pre ostatné metriky)
+        if (item.temp !== null) {
+            groupedData.get(key).push(item);
         }
-    }
-    
-    // Premapujeme celý dataset pre interné agregačné funkcie
-    // (tie očakávajú 'timestamp' namiesto 't' a plné názvy)
-    const mappedData = data.map(record => ({
-         timestamp: record.t,
-         temp: record.temp,
-         humidity: record.hum, // mapovanie hum -> humidity
-         pressure: record.press, // mapovanie press -> pressure
-         rain: record.rain, 
-         wind_speed: record.ws, // mapovanie ws -> wind_speed
-         wind_gust: record.wg, // mapovanie wg -> wind_gust
-         wind_dir: record.wd, // mapovanie wd -> wind_dir
-         solar_rad: record.sr, // mapovanie sr -> solar_rad
-         uv: record.uv
-         // dew_point tu chýba, ak by bolo treba, muselo by sa vypočítať alebo pridať do 'data'
-    }));
+    });
 
-
-    // 2. Agregácia dát podľa zvolenej granularity
-    // Agregujeme všetky premenné OKREM 'rain' (ktorý je kumulatívny)
-    const nonRainVariables = variables.filter(v => v !== 'rain');
-    const aggregatedPeriods = aggregationFunction(mappedData, nonRainVariables);
-
-    // 3. Vloženie agregovaných zrážok (súčtov) do agregovaných periód
-    // Musíme prejsť všetky prírastky a pripočítať ich k správnemu bloku (hodina/deň/týždeň)
-    if (variables.includes('rain')) {
-        const getPeriodKey = (granularity === 'hourly') ? getStartOfHour :
-                             (granularity === 'daily') ? getStartOfDay :
-                             getStartOfWeek;
-
-        const rainAggregates = new Map(); // Map<period_timestamp, sum>
+    const aggregatedPeriods = [];
+    Array.from(groupedData.keys()).sort((a, b) => a - b).forEach(key => {
+        const periodItems = groupedData.get(key); // Items s platnými dátami
+        const periodResult = { timestamp: key, values: {} };
         
-        rainIncrements.forEach((increment, timestamp) => {
-            const periodKey = getPeriodKey(timestamp).getTime();
-            const currentSum = rainAggregates.get(periodKey) || 0;
-            rainAggregates.set(periodKey, currentSum + increment);
-        });
+        // Získame VŠETKY položky (vrátane null) len pre zistenie timestampov
+        const allPeriodItems = data.filter(item => getGroupKey(item.t, granularity) === key);
 
-        // Priradenie súčtov zrážok do finálnych dát pre graf
-        for (const period of aggregatedPeriods) {
-            const periodKey = period.timestamp;
-            const rainSum = rainAggregates.get(periodKey);
+        variables.forEach(variable => {
+            const values = periodItems.map(item => item[variable]).filter(v => v !== null);
             
-            // Zaistíme, že aj keď nepršalo, 'rain' objekt existuje (kvôli grafu)
-            period.values.rain = {
-                sum: (rainSum !== null && rainSum !== undefined) ? (Math.round(rainSum * 10) / 10) : 0,
-                min: null, 
-                max: null,
-                avg: null
-            };
-        }
-    }
-
-
-    // 4. Výpočet finálnych min/max/avg hodnôt pre každú periódu
-    for (const period of aggregatedPeriods) {
-        for (const variable in period.values) {
-            if (variable !== 'rain') { // Zrážky už majú finálny 'sum'
-                const stats = period.values[variable];
-                if (stats.count > 0) {
-                    stats.avg = stats.sum / stats.count;
-                } else {
-                    stats.avg = null;
-                    stats.min = null;
-                    stats.max = null;
-                }
-            }
-        }
-    }
-
-    // 5. Výpočet súhrnnej tabuľky (Total, Min, Max, Avg)
-    const summaries = {};
-    for (const variable of variables) {
-        // Logika pre premenné, kde rátame min/max/avg z celého surového datasetu
-        // (okrem 'rain', ktorý má špeciálnu logiku)
-        
-        // Premenné len s maximom
-        if (['pressure', 'wind_speed', 'wind_gust', 'uv', 'solar_rad'].includes(variable)) {
-            const validValues = mappedData.map(d => d[variable]).filter(v => v !== null && v !== undefined);
-            if (validValues.length > 0) {
-                const maxVal = Math.max(...validValues);
-                const maxIndex = mappedData.findIndex(d => d[variable] === maxVal);
-                summaries[variable] = {
-                    max: maxVal,
-                    maxTime: mappedData[maxIndex]?.timestamp,
+            let sum;
+            if (variable === 'rain') {
+                let periodRainSum = 0;
+                allPeriodItems.forEach(item => {
+                    if (rainIncrements.has(item.t)) {
+                        periodRainSum += rainIncrements.get(item.t);
+                    }
+                });
+                sum = Math.round(periodRainSum * 10) / 10;
+                // Zaistíme, že aj keď nepršalo, 'rain' objekt existuje (kvôli grafu)
+                periodResult.values[variable] = { min: null, avg: null, max: null, sum: sum };
+            } else {
+                 if (values.length === 0) {
+                    periodResult.values[variable] = { min: null, avg: null, max: null, sum: null };
+                    return;
+                 }
+                sum = values.reduce((a, b) => a + b, 0);
+                periodResult.values[variable] = { 
+                    min: values.length > 0 ? Math.min(...values) : null, 
+                    avg: (variable !== 'rain' && values.length > 0) ? sum / values.length : null, 
+                    max: values.length > 0 ? Math.max(...values) : null, 
+                    sum: sum 
                 };
             }
-        }
+        });
+        aggregatedPeriods.push(periodResult);
+    });
 
-        // --- ZAČIATOK OPRAVENÉHO BLOKU PRE ZRÁŽKY ---
+    let windRoseData = null;
+    if (variables.includes('ws') || variables.includes('wg')) {
+        const directionCounts = new Array(16).fill(0);
+        let totalCount = 0;
+        data.forEach(item => {
+            if (item.ws !== null && item.ws > 0.5 && item.wd !== null) {
+                const sectorIndex = Math.floor((item.wd / 22.5) + 0.5) % 16;
+                directionCounts[sectorIndex]++;
+                totalCount++;
+            }
+        });
+        if (totalCount > 0) {
+            windRoseData = directionCounts.map(count => (count / totalCount) * 100);
+        }
+    }
+
+    const summaries = {};
+    variables.forEach(variable => {
+        const allItems = data.filter(item => item[variable] !== null);
+        
+        // =======================================================
+        // --- TU JE ZAČIATOK OPRAVENÉHO BLOKU PRE ZRÁŽKY ---
+        // =======================================================
         if (variable === 'rain') {
             // Vytvoríme mapu denných súčtov, bez ohľadu na granularitu grafu
+            // Použijeme internú funkciu getGroupKey na nájdenie dňa
             const dailyTotals = new Map();
             rainIncrements.forEach((increment, timestamp) => {
-                // Získame kľúč dňa (napr. '2025-07-07 00:00:00')
-                const dayKey = new Date(timestamp).setHours(0, 0, 0, 0);
+                const dayKey = getGroupKey(timestamp, 'daily'); // Použijeme existujúcu helper funkciu
                 const currentTotal = dailyTotals.get(dayKey) || 0;
                 dailyTotals.set(dayKey, currentTotal + increment);
             });
@@ -252,78 +179,44 @@ export function aggregateCustomRange(data, variables, rangeInDays) {
                 }
             });
             
-            // Zaokrúhlime finálnu hodnotu
             maxDailyRain = Math.round(maxDailyRain * 10) / 10;
-            
-            // Zaokrúhlenie celkového súčtu
-            const roundedTotalRainSum = Math.round(totalRainSum * 10) / 10;
 
             summaries[variable] = {
-                total: roundedTotalRainSum, 
-                max: maxDailyRain, // Toto je teraz správna MAX DENNÁ hodnota
-                maxTime: maxDailyRainTime, // Toto je teraz správny dátum
-                avg: dailyTotals.size > 0 ? roundedTotalRainSum / dailyTotals.size : 0, // Priemer na dni, kedy pršalo
+                total: totalRainSum, 
+                max: maxDailyRain, // <-- TOTO JE OPRAVENÁ HODNOTA
+                maxTime: maxDailyRainTime, // <-- TOTO JE OPRAVENÝ DÁTUM
+                avg: dailyTotals.size > 0 ? totalRainSum / dailyTotals.size : 0,
             };
-        // --- KONIEC OPRAVENÉHO BLOKU PRE ZRÁŽKY ---
-        
-        // Premenné s min/max/avg
-        } else if (['temp', 'humidity', 'dew_point'].includes(variable)) {
-             const validValues = mappedData.map(d => d[variable]).filter(v => v !== null && v !== undefined);
-             if (validValues.length > 0) {
-                const maxVal = Math.max(...validValues);
-                const maxIndex = mappedData.findIndex(d => d[variable] === maxVal);
-                
-                const minVal = Math.min(...validValues);
-                const minIndex = mappedData.findIndex(d => d[variable] === minVal);
-
-                const sum = validValues.reduce((a, b) => a + b, 0);
-                const avg = sum / validValues.length;
-
-                summaries[variable] = {
-                    max: maxVal,
-                    maxTime: mappedData[maxIndex]?.timestamp,
-                    min: minVal,
-                    minTime: mappedData[minIndex]?.timestamp,
-                    avg: avg,
-                };
-             }
-        }
-    }
-
-    // 6. Logika pre veternú ružicu
-    let windRoseData = null;
-    if (variables.includes('wind_speed') || variables.includes('wind_gust')) {
-        const windCounts = new Array(16).fill(0);
-        let totalWindEvents = 0;
-        const MIN_WIND_SPEED_FILTER = 0.5; // Zhodné s aggregation-methods.js
-
-        mappedData.forEach(item => {
-            // Používame 'wind_speed' a 'wind_dir' z mapovaných dát
-            if (item.wind_speed !== null && item.wind_speed >= MIN_WIND_SPEED_FILTER && item.wind_dir !== null) {
-                const val = Math.floor((item.wind_dir / 22.5) + 0.5);
-                const directionIndex = val % 16;
-                windCounts[directionIndex]++;
-                totalWindEvents++;
-            }
-        });
-
-        if (totalWindEvents > 0) {
-            windRoseData = windCounts.map(count => (count / totalWindEvents) * 100);
+        // =======================================================
+        // --- TU JE KONIEC OPRAVENÉHO BLOKU PRE ZRÁŽKY ---
+        // =======================================================
         } else {
-            windRoseData = new Array(16).fill(0);
+             if (allItems.length === 0) {
+                summaries[variable] = { max: null, min: null, avg: null, total: null, wdMode: null };
+                return;
+            }
+            const allValues = allItems.map(item => item[variable]);
+            const maxVal = Math.max(...allValues);
+            
+            let minVal;
+            if (variable === 'ws' || variable === 'wg') {
+                const nonZeroValues = allValues.filter(v => v > 0);
+                minVal = nonZeroValues.length > 0 ? Math.min(...nonZeroValues) : null;
+            } else {
+                minVal = Math.min(...allValues);
+            }
+
+            summaries[variable] = {
+                max: maxVal,
+                min: minVal,
+                avg: allValues.reduce((a, b) => a + b, 0) / allValues.length,
+                maxTime: allItems.find(item => item[variable] === maxVal)?.t,
+                minTime: minVal !== null ? allItems.find(item => item[variable] === minVal)?.t : null,
+                unit: UNITS[variable],
+                wdMode: (variable === 'ws' || variable === 'wg') ? calculateWindMode(allItems) : null,
+            };
         }
-    }
-    
-    // 7. Logika pre metódy agregácie
-    const aggregationMethod = {};
-    variables.forEach(v => {
-        // Predvolená metóda pre multigrafy (premenné okrem zrážok)
-        aggregationMethod[v] = 'avg'; 
     });
-    // Špeciálna metóda pre zrážky
-    aggregationMethod['rain'] = 'sum';
-
-
-    // 8. Vrátenie všetkých potrebných dát
-    return { aggregatedPeriods, summaries, granularity, windRoseData, aggregationMethod };
+    
+    return { aggregatedPeriods, summaries, granularity, aggregationMethod: AGGREGATION_METHOD, windRoseData };
 }
