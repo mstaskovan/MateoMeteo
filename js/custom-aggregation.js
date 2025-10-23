@@ -1,3 +1,4 @@
+// js/custom-aggregation.js
 import { getStartOfHour, getStartOfDay, getStartOfWeek } from './utils.js';
 
 // Helper funkcia pre agregáciu dát do hodinových blokov
@@ -232,7 +233,9 @@ export function aggregateData(data, granularity, variables) {
                 avg: dailyTotals.size > 0 ? totalRainSum / dailyTotals.size : 0, // Priemer na dni, kedy pršalo
             };
         // --- KONIEC OPRAVENÉHO BLOKU PRE ZRÁŽKY ---
-        } else if (variable.includes('temp') || variable === 'humidity' || variable === 'dew_point') {
+        
+        // ***** TOTO JE OPRAVENÝ RIADOK - ZMAZAL SOM JEDNU '}' *****
+        else if (variable.includes('temp') || variable === 'humidity' || variable === 'dew_point') {
              const validValues = data.map(d => d[variable]).filter(v => v !== null && v !== undefined);
              if (validValues.length > 0) {
                 const maxVal = Math.max(...validValues);
