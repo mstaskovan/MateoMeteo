@@ -7,7 +7,7 @@ import { LOCAL_OFFSET_HOURS, formatTimestampToLocalDate } from './utils.js';
  */
 function calculateWindMode(items) {
     const wdCounts = new Map();
-    const MIN_WIND_SPEED_FILTER = 0.5;
+    const MIN_WIND_SPEED_FILTER = 0.5; // Zjednotené s custom-aggregation.js
 
     items.forEach(item => {
         if (item.ws !== null && item.ws >= MIN_WIND_SPEED_FILTER && item.wd !== null) {
@@ -26,46 +26,60 @@ function calculateWindMode(items) {
     return modeWD;
 }
 
-
 /**
- * Hlavná funkcia pre výpočet súhrnných štatistík (OKREM ZRÁŽOK) pre dané obdobie.
+ * OPRAVENÁ VERZIA: Hlavná funkcia pre výpočet súhrnných štatistík (OKREM ZRÁŽOK).
+ * VŽDY VRACIA OBJEKT, NIKDY NULL.
  */
 function calculateOverallSummary(items) {
-    if (items.length === 0) return null;
+    // Inicializácia s null hodnotami ako predvolenými
+    const defaultSummary = { tempAvg: null, tempMax: null, tempMaxTime: null, tempMin: null, tempMinTime: null, humAvg: null, humMax: null, humMaxTime: null, humMin: null, humMinTime: null, pressAvg: null, pressMax: null, pressMaxTime: null, pressMin: null, pressMinTime: null, wsAvg: null, wsMax: null, wsMaxTime: null, wgMax: null, wgMaxTime: null, wgMin: null, wgMinTime: null, srAvg: null, srMax: null, srMaxTime: null, uvAvg: null, uvMax: null, uvMaxTime: null, wdMode: null };
+
+    if (!items || items.length === 0) {
+        return defaultSummary; // Vráti objekt s null hodnotami, ak nie sú dáta
+    }
     
-    // Zrážky (rain) sú odtiaľto úplne odstránené
     const metrics = { temp: { sum: 0, count: 0, max: -Infinity, min: Infinity, maxT: null, minT: null }, hum: { sum: 0, count: 0, max: -Infinity, min: Infinity, maxT: null, minT: null }, press: { sum: 0, count: 0, max: -Infinity, min: Infinity, maxT: null, minT: null }, ws: { sum: 0, count: 0, max: -Infinity, maxT: null }, wg: { min: Infinity, minT: null, max: -Infinity, maxT: null }, sr: { sum: 0, count: 0, max: -Infinity, maxT: null }, uv: { sum: 0, count: 0, max: -Infinity, maxT: null } };
     
     items.forEach(item => {
         const t = item.t;
         ['temp', 'hum', 'press'].forEach(key => {
-            if (item[key] !== null) {
+            if (item[key] !== null && typeof item[key] !== 'undefined') {
                 metrics[key].sum += item[key];
                 metrics[key].count++;
                 if (item[key] > metrics[key].max) { metrics[key].max = item[key]; metrics[key].maxT = t; }
                 if (item[key] < metrics[key].min) { metrics[key].min = item[key]; metrics[key].minT = t; }
             }
         });
-        if (item.ws !== null) {
+        if (item.ws !== null && typeof item.ws !== 'undefined') {
             metrics.ws.sum += item.ws;
             metrics.ws.count++;
             if (item.ws > metrics.ws.max) { metrics.ws.max = item.ws; metrics.ws.maxT = t; }
         }
-        if (item.wg !== null) {
+        if (item.wg !== null && typeof item.wg !== 'undefined') {
+             // Upravená logika pre wgMin, aby brala aj nulu, ak je to jediná hodnota
+            if (metrics.wg.min === Infinity && item.wg >= 0) { metrics.wg.min = item.wg; metrics.wg.minT = t; }
+            // Ale ak už máme platné minimum, hľadáme len minimum > 0
+            else if (item.wg > 0 && item.wg < metrics.wg.min) { metrics.wg.min = item.wg; metrics.wg.minT = t; }
+            
             if (item.wg > metrics.wg.max) { metrics.wg.max = item.wg; metrics.wg.maxT = t; }
-            if (item.wg > 0 && item.wg < metrics.wg.min) { metrics.wg.min = item.wg; metrics.wg.minT = t; }
         }
-        if (item.sr !== null) {
+        if (item.sr !== null && typeof item.sr !== 'undefined') {
             metrics.sr.sum += item.sr;
             metrics.sr.count++;
             if (item.sr > metrics.sr.max) { metrics.sr.max = item.sr; metrics.sr.maxT = t; }
         }
-        if (item.uv !== null) {
+        if (item.uv !== null && typeof item.uv !== 'undefined') {
             metrics.uv.sum += item.uv;
             metrics.uv.count++;
             if (item.uv > metrics.uv.max) { metrics.uv.max = item.uv; metrics.uv.maxT = t; }
         }
     });
+
+    // Ak po iterácii zostalo wg.min ako Infinity (napr. boli len nárazy == 0), nastavíme ho na null
+    if (metrics.wg.min === Infinity) {
+        metrics.wg.min = null;
+        metrics.wg.minT = null;
+    }
 
     return {
         tempAvg: metrics.temp.count > 0 ? metrics.temp.sum / metrics.temp.count : null,
@@ -88,7 +102,7 @@ function calculateOverallSummary(items) {
         wsMaxTime: metrics.ws.maxT,
         wgMax: metrics.wg.max !== -Infinity ? metrics.wg.max : null,
         wgMaxTime: metrics.wg.maxT,
-        wgMin: metrics.wg.min !== Infinity ? metrics.wg.min : null,
+        wgMin: metrics.wg.min, // Už ošetrené vyššie
         wgMinTime: metrics.wg.minT,
         srAvg: metrics.sr.count > 0 ? metrics.sr.sum / metrics.sr.count : null,
         srMax: metrics.sr.max !== -Infinity ? metrics.sr.max : null,
@@ -96,9 +110,10 @@ function calculateOverallSummary(items) {
         uvAvg: metrics.uv.count > 0 ? metrics.uv.sum / metrics.uv.count : null,
         uvMax: metrics.uv.max !== -Infinity ? metrics.uv.max : null,
         uvMaxTime: metrics.uv.maxT,
-        wdMode: calculateWindMode(items)
+        wdMode: calculateWindMode(items) // calculateWindMode už zvláda prázdne pole
     };
 }
+
 
 /**
  * FINÁLNA VERZIA: Pomocná funkcia na výpočet prírastkov zrážok,
@@ -120,9 +135,12 @@ function calculateRainIncrements(data) {
         if (lastValidRain === null) {
             lastValidRain = curr.rain;
             // Prvý záznam dňa (alebo po sérii null) môže sám o sebe predstavovať prírastok (ak bol reset o polnoci)
-            if (curr.rain > 0) {
+            // Musíme skontrolovať, či to nie je úplne prvý záznam v dátach (index 0)
+            // a či predchádzajúci záznam (ak existuje) mal rain = null. Vtedy berieme curr.rain ako prírastok.
+            // Jednoduchšie: Ak je lastValidRain null A curr.rain > 0, berieme to ako prírastok.
+             if (curr.rain > 0) {
                  rainIncrements.set(curr.t, curr.rain);
-            }
+             }
             continue;
         }
 
@@ -142,25 +160,38 @@ function calculateRainIncrements(data) {
 
 export function aggregateHourlyData(data, rawDate) {
     const filteredData = data.filter(item => formatTimestampToLocalDate(item.t) === rawDate);
-    if (filteredData.length === 0) return { data: [], mode: 'hourly', summary: null };
-
     // Dátové položky, ktoré majú platné dáta pre súhrn (napr. temp)
-    const validItemsForSummary = filteredData.filter(item => item.temp !== null && item.hum !== null);
-    const summary = calculateOverallSummary(validItemsForSummary);
+    // Upravené: stačí, ak aspoň JEDNA hodnota nie je null, aby sme rátali súhrn
+    const validItemsForSummary = filteredData.filter(item => item.temp !== null || item.hum !== null || item.press !== null || item.ws !== null || item.wg !== null || item.sr !== null || item.uv !== null);
     
+    // Summary teraz VŽDY bude objekt vďaka úprave calculateOverallSummary
+    const summary = calculateOverallSummary(validItemsForSummary); 
+    
+    // Ak NEEXISTUJÚ ŽIADNE dáta pre daný deň, vrátime prázdnu štruktúru
+    if (filteredData.length === 0) {
+       return { data: [], mode: 'hourly', summary: summary }; // summary bude default objekt s null
+    }
+
     // --- Vypočítame prírastky zrážok pre celý deň ---
     const rainIncrements = calculateRainIncrements(filteredData);
 
     const hourlyDataMap = new Map();
-    // Zoskupíme len platné položky (tie, čo nie sú null)
+    // Zoskupíme všetky položky, vrátane tých s null hodnotami (pre zrážky)
     filteredData.forEach(item => { 
-        if (item.temp === null) return; // Preskočíme riadky, kde sú všetky dáta null
-        
-        const hourKey = (new Date(item.t).getUTCHours() + LOCAL_OFFSET_HOURS) % 24; 
+        // Vypočítame hodinu na základe UTC a lokálneho offsetu
+        const itemDate = new Date(item.t);
+        const localHour = (itemDate.getUTCHours() + LOCAL_OFFSET_HOURS) % 24; 
+        const hourKey = String(localHour).padStart(2, '0'); // Kľúč ako string '00', '01', ... '23'
+
         if (!hourlyDataMap.has(hourKey)) {
-            hourlyDataMap.set(hourKey, { rawItems: [] });
+             // rawItems pre výpočet priemerov (len non-null), allItems pre zrážky (všetky)
+            hourlyDataMap.set(hourKey, { rawItems: [], allItems: [] });
         }
-        hourlyDataMap.get(hourKey).rawItems.push(item); 
+        hourlyDataMap.get(hourKey).allItems.push(item); 
+        // Pridáme len platné položky do rawItems pre ostatné metriky
+        if (item.temp !== null || item.hum !== null || item.press !== null || item.ws !== null || item.wg !== null || item.sr !== null || item.uv !== null) {
+            hourlyDataMap.get(hourKey).rawItems.push(item);
+        }
     });
     
     const aggregatedData = [];
@@ -168,57 +199,54 @@ export function aggregateHourlyData(data, rawDate) {
     let maxHourlyRain = 0;
     let maxHourlyRainTime = null;
 
-    // Musíme prejsť všetkých 24 hodín, aj keď pre ne nemáme dáta (kvôli výpadku)
-    for (let hourKey = 0; hourKey < 24; hourKey++) {
+    // Musíme prejsť všetkých 24 hodín ('00' až '23')
+    for (let hour = 0; hour < 24; hour++) {
+        const hourKey = String(hour).padStart(2, '0');
         const record = hourlyDataMap.get(hourKey);
         
-        // Spočítame Temp, Hum, atď. len ak máme dáta (record nie je undefined)
+        // Spočítame Temp, Hum, atď. len ak máme dáta (record nie je undefined a rawItems nie je prázdne)
         const hourSummary = (record && record.rawItems.length > 0) 
             ? calculateOverallSummary(record.rawItems) 
             : {}; // Bezpečný fallback pre prázdne hodiny
 
         // Sčítame 10-min prírastky, ktoré patria do tejto hodiny
         let hourRainTotal = 0;
-        
-        // Získame všetky timestampy (aj z null riadkov), ktoré patria do tejto hodiny
-        const timestampsInThisHour = filteredData
-            .filter(item => ((new Date(item.t).getUTCHours() + LOCAL_OFFSET_HOURS) % 24) === hourKey)
-            .map(item => item.t);
-
-        // Sčítame prírastky, ktoré sa udiali v tejto hodine
-        timestampsInThisHour.forEach(t => {
-            if (rainIncrements.has(t)) {
-                hourRainTotal += rainIncrements.get(t);
-            }
-        });
+        if (record && record.allItems.length > 0) {
+            // Použijeme allItems pre zrážky
+            record.allItems.forEach(item => {
+                if (rainIncrements.has(item.t)) {
+                    hourRainTotal += rainIncrements.get(item.t);
+                }
+            });
+        }
         hourRainTotal = Math.round(hourRainTotal * 10) / 10;
 
         totalRainSum += hourRainTotal;
         if (hourRainTotal > maxHourlyRain) {
             maxHourlyRain = hourRainTotal;
-            
-            // OPRAVA CHYBY: Vytvoríme čas na základe rawDate a hourKey, nie z 'record'
-            const dateForHour = new Date(`${rawDate}T00:00:00Z`); // Začíname o polnoci UTC
-            // Prirátame hodinu a UTC offset, aby sme dostali správny lokálny čas
-            dateForHour.setUTCHours(hourKey, 0, 0, 0);
-            maxHourlyRainTime = dateForHour.getTime() - (LOCAL_OFFSET_HOURS * 60 * 60 * 1000);
+            // Nájdeme prvý timestamp z danej hodiny ako reprezentatívny čas
+             const firstTimestampOfHour = record?.allItems[0]?.t;
+             maxHourlyRainTime = firstTimestampOfHour || new Date(`${rawDate}T${hourKey}:00:00`).getTime(); // Fallback
         }
         
         aggregatedData.push({ 
-            time: `${String(hourKey).padStart(2, '0')}:00`, 
-            temp: hourSummary.tempAvg || null, 
-            hum: hourSummary.humAvg || null, 
-            press: hourSummary.pressAvg || null, 
-            ws: hourSummary.wsAvg || null, 
-            wg: hourSummary.wgMax || null, 
-            wd: hourSummary.wdMode || null, 
+            time: `${hourKey}:00`, 
+            // Použijeme hodnoty z hourSummary alebo null, ak neboli dáta
+            temp: hourSummary.tempAvg ?? null, 
+            hum: hourSummary.humAvg ?? null, 
+            press: hourSummary.pressAvg ?? null, 
+            ws: hourSummary.wsAvg ?? null, 
+            wg: hourSummary.wgMax ?? null, // Pre hodinový náraz berieme max z danej hodiny
+            wd: hourSummary.wdMode ?? null, 
             rain: hourRainTotal, 
-            sr: hourSummary.srAvg || null, 
-            uv: hourSummary.uvAvg || null, 
+            sr: hourSummary.srAvg ?? null, 
+            uv: hourSummary.uvAvg ?? null, 
         });
     }
-
+    
+    // Pridáme súhrn zrážok do celkového súhrnu (ktorý už existuje a nie je null)
     summary.rainSumOfTotals = Math.round(totalRainSum * 10) / 10;
+    // V dennom (hodinovom) prehľade chceme max HODINOVÝ úhrn
     summary.maxDailyRain = maxHourlyRain; 
     summary.maxDailyRainTime = maxHourlyRainTime;
 
@@ -227,10 +255,16 @@ export function aggregateHourlyData(data, rawDate) {
 
 export function aggregateDailyData(data, selectedMonth) {
     const filteredData = data.filter(item => formatTimestampToLocalDate(item.t).startsWith(selectedMonth));
-    if (filteredData.length === 0) return { data: [], mode: 'daily', summary: null };
+    // Upravené: stačí, ak aspoň JEDNA hodnota nie je null, aby sme rátali súhrn
+    const validItemsForSummary = filteredData.filter(item => item.temp !== null || item.hum !== null || item.press !== null || item.ws !== null || item.wg !== null || item.sr !== null || item.uv !== null);
     
-    const validItemsForSummary = filteredData.filter(item => item.temp !== null && item.hum !== null);
+    // Summary teraz VŽDY bude objekt
     const summary = calculateOverallSummary(validItemsForSummary);
+
+    // Ak NEEXISTUJÚ ŽIADNE dáta pre daný mesiac, vrátime prázdnu štruktúru
+    if (filteredData.length === 0) {
+       return { data: [], mode: 'daily', summary: summary }; // summary bude default objekt s null
+    }
     
     // --- LOGIKA VÝPOČTU ZRÁŽOK PRE MESIAC ---
     const rainIncrements = calculateRainIncrements(filteredData);
@@ -240,12 +274,14 @@ export function aggregateDailyData(data, selectedMonth) {
     filteredData.forEach(item => { 
         const dayKey = formatTimestampToLocalDate(item.t); 
         if (!dailyDataMap.has(dayKey)) {
+             // rawItems pre výpočet priemerov (len non-null), allItems pre zrážky (všetky)
             dailyDataMap.set(dayKey, { day: dayKey.split('-')[2], rawItems: [], allItems: [] }); 
         }
         // Uložíme všetky položky dňa pre výpočet zrážok
         dailyDataMap.get(dayKey).allItems.push(item);
         
-        if (item.temp !== null) { // Pridávame len platné záznamy pre súhrn
+        // Pridávame len platné záznamy do rawItems pre ostatné metriky
+        if (item.temp !== null || item.hum !== null || item.press !== null || item.ws !== null || item.wg !== null || item.sr !== null || item.uv !== null) {
             dailyDataMap.get(dayKey).rawItems.push(item); 
         }
     });
@@ -255,6 +291,7 @@ export function aggregateDailyData(data, selectedMonth) {
     
     Array.from(dailyDataMap.keys()).sort().forEach(dayKey => {
         const record = dailyDataMap.get(dayKey);
+        // daySummary bude vždy objekt
         const daySummary = calculateOverallSummary(record.rawItems);
         
         // Sčítame 10-min prírastky, ktoré patria do tohto dňa
@@ -270,29 +307,35 @@ export function aggregateDailyData(data, selectedMonth) {
         
         aggregatedData.push({ 
             day: record.day, 
-            tempAvg: daySummary.tempAvg, 
-            humAvg: daySummary.humAvg, 
-            pressAvg: daySummary.pressAvg, 
-            wsAvg: daySummary.wsAvg, 
-            wgMax: daySummary.wgMax, 
-            wdMode: daySummary.wdMode, 
+            // Použijeme hodnoty z daySummary alebo null, ak neboli dáta
+            tempAvg: daySummary.tempAvg ?? null, 
+            humAvg: daySummary.humAvg ?? null, 
+            pressAvg: daySummary.pressAvg ?? null, 
+            wsAvg: daySummary.wsAvg ?? null, 
+            wgMax: daySummary.wgMax ?? null, // Pre denný náraz berieme max z daného dňa
+            wdMode: daySummary.wdMode ?? null, 
             rainTotal: dayRainTotal, 
-            srAvg: daySummary.srAvg, 
-            uvAvg: daySummary.uvAvg, 
+            srAvg: daySummary.srAvg ?? null, 
+            uvAvg: daySummary.uvAvg ?? null, 
         });
     });
     
+    // Nájdeme deň s najvyššími zrážkami
     let maxDailyRain = 0;
     let maxDailyRainTime = null;
     aggregatedData.forEach(dayData => {
         if (dayData.rainTotal > maxDailyRain) {
             maxDailyRain = dayData.rainTotal;
+             // Vytvoríme timestamp pre začiatok dňa
             const dateStr = `${selectedMonth}-${String(dayData.day).padStart(2, '0')}`;
-            maxDailyRainTime = new Date(dateStr).getTime();
+            // Použijeme Date.parse alebo new Date().getTime() pre konzistenciu
+            maxDailyRainTime = new Date(dateStr).getTime(); 
         }
     });
     
+    // Pridáme súhrn zrážok do celkového súhrnu
     summary.rainSumOfTotals = Math.round(totalRainSum * 10) / 10;
+    // V mesačnom (dennom) prehľade chceme max DENNÝ úhrn
     summary.maxDailyRain = maxDailyRain;
     summary.maxDailyRainTime = maxDailyRainTime;
     
