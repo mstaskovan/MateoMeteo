@@ -2,7 +2,9 @@
 import { fetchAvailableFiles, getAvailableDateRange, loadDataForRange } from './data-loader.js';
 import { aggregateCustomRange } from './custom-aggregation.js';
 import { renderChart, renderWindRoseChart } from './chart-renderer.js';
-import { formatTimestampToLocalDate, generateAvailableDataString } from './utils.js';
+
+// --- UPRAVENÝ RIADOK: Importujeme novú funkciu 'formatTimestampToDisplayDate' ---
+import { formatTimestampToDisplayDate, generateAvailableDataString } from './utils.js';
 
 const VARIABLES = {
     temp: { label: 'Teplota (°C)', unit: '°C', color: '#007bff', yAxisID: 'y' },
@@ -152,7 +154,9 @@ document.addEventListener('DOMContentLoaded', async () => {
             const summary = summaries[variable];
             const config = VARIABLES[variable];
             const f = (val, dec = 1) => (val !== null ? val.toFixed(dec) : '-');
-            const t = (ts) => (ts ? `${formatTimestampToLocalDate(ts)}` : '');
+            
+            // --- UPRAVENÝ RIADOK: Používame 'formatTimestampToDisplayDate' ---
+            const t = (ts) => (ts ? `${formatTimestampToDisplayDate(ts)}` : '');
 
             let minLabel = 'Minimum';
             if (variable === 'ws' || variable === 'wg') {
@@ -176,4 +180,3 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     init();
 });
-
