@@ -1,5 +1,7 @@
 // js/custom-aggregation.js
-import { getStartOfHour, getStartOfDay, getStartOfWeek, WIND_DIRECTIONS } from './utils.js';
+
+// ***** TOTO JE OPRAVENÝ RIADOK 1 *****
+import { getStartOfHour, getStartOfDay, getStartOfWeek } from './utils.js';
 
 // Helper funkcia pre agregáciu dát do hodinových blokov
 function aggregateByHour(data, variables) {
@@ -90,15 +92,13 @@ function aggregateByWeek(data, variables) {
 
 /**
  * Agreguje dáta (zo servera) a počíta súhrnné štatistiky.
- * @param {Array} data - Surové dáta z `data-loader.js`
+ * @param {Array} data - Surové dáta z `data-loader.js` (objekty s 't', 'temp', 'hum'...)
  * @param {Array} variables - Polia premenných (napr. ['temp', 'rain'])
  * @param {number} rangeInDays - Počet dní v rozsahu
  * @returns {Object} - { aggregatedPeriods, summaries, granularity, windRoseData, aggregationMethod }
  */
-// ***** OPRAVA 1: Obnovený správny názov funkcie a argumenty *****
 export function aggregateCustomRange(data, variables, rangeInDays) {
     
-    // ***** OPRAVA 2: Vrátená chýbajúca logika pre granularitu *****
     let granularity;
     if (rangeInDays <= 2) {
         granularity = 'hourly';
@@ -124,51 +124,38 @@ export function aggregateCustomRange(data, variables, rangeInDays) {
     const rainIncrements = new Map(); // Map<timestamp, increment>
 
     for (const record of data) {
-        // Premenovanie 't' na 'timestamp' pre konzistenciu s touto funkciou
-        // (Dáta z loadDataForRange majú 't', 'temp', 'hum', ... ale interné funkcie čakajú 'timestamp')
-        // Najlepšie je premapovať dáta na začiatku
-        const mappedRecord = {
-             timestamp: record.t,
-             temp: record.temp,
-             hum: record.hum,
-             press: record.press,
-             rain: record.rain,
-             ws: record.ws,
-             wg: record.wg,
-             wd: record.wd,
-             sr: record.sr,
-             uv: record.uv
-        };
-
-        if (mappedRecord.rain !== null && mappedRecord.rain !== undefined) {
+        // 't' je timestamp
+        if (record.rain !== null && record.rain !== undefined) {
             if (lastRainValue !== null) {
-                let increment = mappedRecord.rain - lastRainValue;
+                let increment = record.rain - lastRainValue;
                 if (increment < 0) {
                     // Reset počítadla (o polnoci alebo pri reštarte stanice)
-                    increment = mappedRecord.rain; 
+                    increment = record.rain; 
                 }
                 if (increment > 0) {
                     totalRainSum += increment;
                     // Uložíme prírastok k presnému timestampu záznamu
-                    rainIncrements.set(mappedRecord.timestamp, increment);
+                    rainIncrements.set(record.t, increment);
                 }
             }
-            lastRainValue = mappedRecord.rain;
+            lastRainValue = record.rain;
         }
     }
     
-    // Premapujeme celý dataset pre ďalšie funkcie
+    // Premapujeme celý dataset pre interné agregačné funkcie
+    // (tie očakávajú 'timestamp' namiesto 't' a plné názvy)
     const mappedData = data.map(record => ({
          timestamp: record.t,
          temp: record.temp,
-         hum: record.hum,
-         press: record.press,
-         rain: record.rain, // rain tu už nevyužijeme, ale pre úplnosť
-         ws: record.ws,
-         wg: record.wg,
-         wd: record.wd,
-         sr: record.sr,
+         humidity: record.hum, // mapovanie hum -> humidity
+         pressure: record.press, // mapovanie press -> pressure
+         rain: record.rain, 
+         wind_speed: record.ws, // mapovanie ws -> wind_speed
+         wind_gust: record.wg, // mapovanie wg -> wind_gust
+         wind_dir: record.wd, // mapovanie wd -> wind_dir
+         solar_rad: record.sr, // mapovanie sr -> solar_rad
          uv: record.uv
+         // dew_point tu chýba, ak by bolo treba, muselo by sa vypočítať alebo pridať do 'data'
     }));
 
 
@@ -229,11 +216,13 @@ export function aggregateCustomRange(data, variables, rangeInDays) {
     for (const variable of variables) {
         // Logika pre premenné, kde rátame min/max/avg z celého surového datasetu
         // (okrem 'rain', ktorý má špeciálnu logiku)
-        if (variable === 'pressure' || variable === 'wind_speed' || variable === 'wind_gust' || variable === 'uv' || variable === 'solar_rad') {
+        
+        // Premenné len s maximom
+        if (['pressure', 'wind_speed', 'wind_gust', 'uv', 'solar_rad'].includes(variable)) {
             const validValues = mappedData.map(d => d[variable]).filter(v => v !== null && v !== undefined);
             if (validValues.length > 0) {
                 const maxVal = Math.max(...validValues);
-                const maxIndex = validValues.indexOf(maxVal);
+                const maxIndex = mappedData.findIndex(d => d[variable] === maxVal);
                 summaries[variable] = {
                     max: maxVal,
                     maxTime: mappedData[maxIndex]?.timestamp,
@@ -265,15 +254,20 @@ export function aggregateCustomRange(data, variables, rangeInDays) {
             
             // Zaokrúhlime finálnu hodnotu
             maxDailyRain = Math.round(maxDailyRain * 10) / 10;
+            
+            // Zaokrúhlenie celkového súčtu
+            const roundedTotalRainSum = Math.round(totalRainSum * 10) / 10;
 
             summaries[variable] = {
-                total: totalRainSum, 
+                total: roundedTotalRainSum, 
                 max: maxDailyRain, // Toto je teraz správna MAX DENNÁ hodnota
                 maxTime: maxDailyRainTime, // Toto je teraz správny dátum
-                avg: dailyTotals.size > 0 ? totalRainSum / dailyTotals.size : 0, // Priemer na dni, kedy pršalo
+                avg: dailyTotals.size > 0 ? roundedTotalRainSum / dailyTotals.size : 0, // Priemer na dni, kedy pršalo
             };
         // --- KONIEC OPRAVENÉHO BLOKU PRE ZRÁŽKY ---
-        } else if (variable.includes('temp') || variable === 'humidity' || variable === 'dew_point') {
+        
+        // Premenné s min/max/avg
+        } else if (['temp', 'humidity', 'dew_point'].includes(variable)) {
              const validValues = mappedData.map(d => d[variable]).filter(v => v !== null && v !== undefined);
              if (validValues.length > 0) {
                 const maxVal = Math.max(...validValues);
@@ -296,16 +290,17 @@ export function aggregateCustomRange(data, variables, rangeInDays) {
         }
     }
 
-    // ***** OPRAVA 3: Vrátená chýbajúca logika pre veternú ružicu *****
+    // 6. Logika pre veternú ružicu
     let windRoseData = null;
-    if (variables.includes('ws') || variables.includes('wg')) {
+    if (variables.includes('wind_speed') || variables.includes('wind_gust')) {
         const windCounts = new Array(16).fill(0);
         let totalWindEvents = 0;
         const MIN_WIND_SPEED_FILTER = 0.5; // Zhodné s aggregation-methods.js
 
         mappedData.forEach(item => {
-            if (item.ws !== null && item.ws >= MIN_WIND_SPEED_FILTER && item.wd !== null) {
-                const val = Math.floor((item.wd / 22.5) + 0.5);
+            // Používame 'wind_speed' a 'wind_dir' z mapovaných dát
+            if (item.wind_speed !== null && item.wind_speed >= MIN_WIND_SPEED_FILTER && item.wind_dir !== null) {
+                const val = Math.floor((item.wind_dir / 22.5) + 0.5);
                 const directionIndex = val % 16;
                 windCounts[directionIndex]++;
                 totalWindEvents++;
@@ -319,7 +314,7 @@ export function aggregateCustomRange(data, variables, rangeInDays) {
         }
     }
     
-    // ***** OPRAVA 4: Vrátená chýbajúca logika pre metódy agregácie *****
+    // 7. Logika pre metódy agregácie
     const aggregationMethod = {};
     variables.forEach(v => {
         // Predvolená metóda pre multigrafy (premenné okrem zrážok)
@@ -329,6 +324,6 @@ export function aggregateCustomRange(data, variables, rangeInDays) {
     aggregationMethod['rain'] = 'sum';
 
 
-    // ***** OPRAVA 5: Vrátenie všetkých potrebných dát *****
+    // 8. Vrátenie všetkých potrebných dát
     return { aggregatedPeriods, summaries, granularity, windRoseData, aggregationMethod };
 }
