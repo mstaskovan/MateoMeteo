@@ -6,62 +6,62 @@ import { degToCard, formatTimestampToLocalTime, formatTimestampToDayMonth, gener
 
 document.addEventListener('DOMContentLoaded', () => {
     const viewMode = document.getElementById('viewMode'); 
-    const dateInput = document.getElementById('dateInput'); 
-    const loadDataButton = document.getElementById('loadDataButton'); 
-    const selectedPeriodSpan = document.getElementById('selected-period'); 
-    const jsonOutput = document.getElementById('json-data'); 
-    const dashboard = document.getElementById('summary-dashboard'); 
-    const availabilityInfo = document.getElementById('data-availability'); 
-    let loadedDataCache = {}; 
-    let availableFiles = [];
+    const dateInput = document.getElementById('dateInput'); 
+    const loadDataButton = document.getElementById('loadDataButton'); 
+    const selectedPeriodSpan = document.getElementById('selected-period'); 
+    const jsonOutput = document.getElementById('json-data'); 
+    const dashboard = document.getElementById('summary-dashboard'); 
+    const availabilityInfo = document.getElementById('data-availability'); 
+    let loadedDataCache = {}; 
+    let availableFiles = [];
 
     async function loadAndDisplayData() { 
-        const mode = viewMode.value;
-        const rawDate = dateInput.value;
-        
-        if (!rawDate) {
-            jsonOutput.innerHTML = '<p class="error">Vyberte prosím dátum alebo mesiac.</p>';
-            dashboard.style.display = "none";
-            return;
-        }
+        const mode = viewMode.value;
+        const rawDate = dateInput.value;
+        
+        if (!rawDate) {
+            jsonOutput.innerHTML = '<p class="error">Vyberte prosím dátum alebo mesiac.</p>';
+            dashboard.style.display = "none";
+            return;
+        }
 
-        const [year, month] = rawDate.split("-");
-        const fileName = `${year}_${month}.json`;
-        const filePath = `data/${fileName}`;
-        const displayPeriod = "day" === mode ? rawDate : `${year}-${month}`;
-        
-        selectedPeriodSpan.textContent = displayPeriod;
-        jsonOutput.innerHTML = "<p>Načítavam dáta...</p>";
-        dashboard.style.display = "none";
-        
-        try {
-            let data = loadedDataCache[fileName];
-            if (!data) {
-                const response = await fetch(filePath);
-                if (!response.ok) {
-                    jsonOutput.innerHTML = `<p class="error">Chyba: Dáta pre ${month}/${year} neboli nájdené.</p>`;
-                    return;
-                }
-                data = await response.json();
-                loadedDataCache[fileName] = data;
-            }
-            
-            const aggregationResult = "day" === mode ? aggregateHourlyData(data, rawDate) : aggregateDailyData(data, displayPeriod);
-            
-            if (!aggregationResult || 0 === aggregationResult.data.length) {
-                jsonOutput.innerHTML = `<p>Pre zvolené obdobie ${displayPeriod} neboli nájdené žiadne záznamy.</p>`;
-                return;
-            }
-            
-            displaySummaryData(aggregationResult.summary, mode);
-            // Použije sa UPRAVENÁ funkcia:
-            displayDataInTable(aggregationResult.data, aggregationResult.mode);
+        const [year, month] = rawDate.split("-");
+        const fileName = `${year}_${month}.json`;
+        const filePath = `data/${fileName}`;
+        const displayPeriod = "day" === mode ? rawDate : `${year}-${month}`;
+        
+        selectedPeriodSpan.textContent = displayPeriod;
+        jsonOutput.innerHTML = "<p>Načítavam dáta...</p>";
+        dashboard.style.display = "none";
+        
+        try {
+            let data = loadedDataCache[fileName];
+            if (!data) {
+                const response = await fetch(filePath);
+                if (!response.ok) {
+                    jsonOutput.innerHTML = `<p class="error">Chyba: Dáta pre ${month}/${year} neboli nájdené.</p>`;
+                    return;
+                }
+                data = await response.json();
+                loadedDataCache[fileName] = data;
+            }
+            
+            const aggregationResult = "day" === mode ? aggregateHourlyData(data, rawDate) : aggregateDailyData(data, displayPeriod);
+            
+            if (!aggregationResult || 0 === aggregationResult.data.length) {
+                jsonOutput.innerHTML = `<p>Pre zvolené obdobie ${displayPeriod} neboli nájdené žiadne záznamy.</p>`;
+                return;
+            }
+            
+            displaySummaryData(aggregationResult.summary, mode);
+            // Použije sa UPRAVENÁ funkcia:
+            displayDataInTable(aggregationResult.data, aggregationResult.mode);
 
-        } catch(error) {
-            console.error("Nastala chyba pri spracovaní dát:", error);
-            jsonOutput.innerHTML = `<p class="error">Vyskytla sa kritická chyba: ${error.message}</p>`;
-        }
-    }
+        } catch(error) {
+            console.error("Nastala chyba pri spracovaní dát:", error);
+            jsonOutput.innerHTML = `<p class="error">Vyskytla sa kritická chyba: ${error.message}</p>`;
+        }
+    }
     
     function displaySummaryData(summary, mode) {
         if (!summary) { dashboard.style.display = 'none'; return; }
@@ -101,129 +101,133 @@ document.addEventListener('DOMContentLoaded', () => {
         dashboard.style.display = 'grid';
     }
     
-    // =======================================================
-    // --- TÁTO CELÁ FUNKCIA BOLA REFAKTORIZOVANÁ ---
-    // (Pridaný 'title' atribút do každej <td> bunky)
-    // =======================================================
+    // =======================================================
+    // --- TÁTO CELÁ FUNKCIA BOLA REFAKTORIZOVANÁ ---
+    // (Pridaný 'title' atribút do každej <td> bunky)
+    // =======================================================
     function displayDataInTable(data, mode) {
-        
-        // Definovanie stĺpcov, aby sme ich mohli prechádzať v cykle
-        const hourlyHeaders = [
-            { label: "Čas", key: "time", align: 'left', decimals: -1 }, // -1 znamená text
-            { label: "Teplota (°C)", key: "temp", align: 'right', decimals: 1 },
-            { label: "Vlhkosť (%)", key: "hum", align: 'right', decimals: 0 },
-            { label: "Tlak (hPa)", key: "press", align: 'right', decimals: 1 },
-            { label: "Rýchl. Vetra (m/s)", key: "ws", align: 'right', decimals: 1 },
-            { label: "Nárazy Vetra (m/s)", key: "wg", align: 'right', decimals: 1 },
-            { label: "Smer Vetra", key: "wd", align: 'center', decimals: -2 }, // -2 znamená smer vetra
-            { label: "Zrážky (mm)", key: "rain", align: 'right', decimals: 1 },
-            { label: "Priem. Solárne (W/m²)", key: "sr", align: 'right', decimals: 0 },
-            { label: "Priem. UV", key: "uv", align: 'right', decimals: 1 }
-        ];
+        
+        // Definovanie stĺpcov, aby sme ich mohli prechádzať v cykle
+        const hourlyHeaders = [
+            { label: "Čas", key: "time", align: 'left', decimals: -1 }, // -1 znamená text
+            { label: "Teplota (°C)", key: "temp", align: 'right', decimals: 1 },
+            { label: "Vlhkosť (%)", key: "hum", align: 'right', decimals: 0 },
+            { label: "Tlak (hPa)", key: "press", align: 'right', decimals: 1 },
+            { label: "Rýchl. Vetra (m/s)", key: "ws", align: 'right', decimals: 1 },
+            { label: "Nárazy Vetra (m/s)", key: "wg", align: 'right', decimals: 1 },
+            { label: "Smer Vetra", key: "wd", align: 'center', decimals: -2 }, // -2 znamená smer vetra
+            { label: "Zrážky (mm)", key: "rain", align: 'right', decimals: 1 },
+            { label: "Priem. Solárne (W/m²)", key: "sr", align: 'right', decimals: 0 },
+            { label: "Priem. UV", key: "uv", align: 'right', decimals: 1 }
+        ];
 
-        const dailyHeaders = [
-            { label: "Deň", key: "day", align: 'left', decimals: -1 },
-            { label: "Priem. Teplota (°C)", key: "tempAvg", align: 'right', decimals: 1 },
-            { label: "Priem. Vlhkosť (%)", key: "humAvg", align: 'right', decimals: 0 },
-            { label: "Priem. Tlak (hPa)", key: "pressAvg", align: 'right', decimals: 1 },
-            { label: "Priem. Rýchl. (m/s)", key: "wsAvg", align: 'right', decimals: 1 },
-            { label: "Max. Náraz (m/s)", key: "wgMax", align: 'right', decimals: 1 },
-            { label: "Smer Vetra", key: "wdMode", align: 'center', decimals: -2 },
-            { label: "Zrážky (mm)", key: "rainTotal", align: 'right', decimals: 1 },
-            { label: "Priem. Solárne (W/m²)", key: "srAvg", align: 'right', decimals: 0 },
-            { label: "Priem. UV", key: "uvAvg", align: 'right', decimals: 1 }
-        ];
+        const dailyHeaders = [
+            { label: "Deň", key: "day", align: 'left', decimals: -1 },
+            { label: "Priem. Teplota (°C)", key: "tempAvg", align: 'right', decimals: 1 },
+            { label: "Priem. Vlhkosť (%)", key: "humAvg", align: 'right', decimals: 0 },
+Â          { label: "Priem. Tlak (hPa)", key: "pressAvg", align: 'right', decimals: 1 },
+            { label: "Priem. Rýchl. (m/s)", key: "wsAvg", align: 'right', decimals: 1 },
+            { label: "Max. Náraz (m/s)", key: "wgMax", align: 'right', decimals: 1 },
+            { label: "Smer Vetra", key: "wdMode", align: 'center', decimals: -2 },
+s          { label: "Zrážky (mm)", key: "rainTotal", align: 'right', decimals: 1 },
+            { label: "Priem. Solárne (W/m²)", key: "srAvg", align: 'right', decimals: 0 },
+            { label: "Priem. UV", key: "uvAvg", align: 'right', decimals: 1 }
+        ];
 
-        const headers = 'hourly' === mode ? hourlyHeaders : dailyHeaders;
-        const f = (val, dec = 1) => (val !== null ? val.toFixed(dec) : "-");
+        const headers = 'hourly' === mode ? hourlyHeaders : dailyHeaders;
+Â      const f = (val, dec = 1) => (val !== null ? val.toFixed(dec) : "-");
 
-        let tableHTML = '<table><thead><tr>';
-        
-        // Vytvorenie hlavičky
-        tableHTML += headers.map(h => `<th>${h.label}</th>`).join("");
-        tableHTML += "</tr></thead><tbody>";
+        let tableHTML = '<table><thead><tr>';
+        
+        // Vytvorenie hlavičky
+        tableHTML += headers.map(h => `<th>${h.label}</th>`).join("");
+        tableHTML += "</tr></thead><tbody>";
 
-        // Vytvorenie riadkov
-        data.forEach(item => {
-            tableHTML += "<tr>";
+        // Vytvorenie riadkov
+        data.forEach(item => {
+            tableHTML += "<tr>";
 
-            // Vytvorenie buniek pre každý stĺpec
-            headers.forEach(header => {
-                let value;
-                let style = `text-align: ${header.align};`; // Štýl pre zarovnanie
+            // Vytvorenie buniek pre každý stĺpec
+            headers.forEach(header => {
+                let value;
+                let style = `text-align: ${header.align};`; // Štýl pre zarovnanie
 
-                if (header.decimals === -1) { // Text (Čas, Deň)
-                    value = item[header.key];
-                } else if (header.decimals === -2) { // Smer vetra
-                    const wdValue = 'hourly' === mode ? item.wd : item.wdMode;
-                    value = degToCard(wdValue);
-                } else { // Číslo
-                    value = f(item[header.key], header.decimals);
-                }
+                if (header.decimals === -1) { // Text (Čas, Deň)
+                    value = item[header.key];
+                } else if (header.decimals === -2) { // Smer vetra
+                    const wdValue = 'hourly' === mode ? item.wd : item.wdMode;
+                    value = degToCard(wdValue);
+                } else { // Číslo
+                    value = f(item[header.key], header.decimals);
+                }
 
-                // --- TOTO JE POŽADOVANÁ ZMENA ---
-                // Pridáme `title` atribút do každej `<td>` bunky
-                tableHTML += `<td style="${style}" title="${header.label}">${value}</td>`;
-            });
+                // --- TOTO JE POŽADOVANÁ ZMENA ---
+                // Pridáme `title` atribút do každej `<td>` bunky
+                tableHTML += `<td style="${style}" title="${header.label}">${value}</td>`;
+s           });
 
-            tableHTML += "</tr>";
-        });
+            tableHTML += "</tr>";
+        });
 
-        tableHTML += "</tbody></table>";
-        jsonOutput.innerHTML = tableHTML;
-    }
-    // =======================================================
-    // --- KONIEC REFAKTORIZOVANEJ FUNKCIE ---
-    // =======================================================
+        tableHTML += "</tbody></table>";
+
+        // =======================================================
+        // --- TOTO JE FINÁLNA ÚPRAVA PRE PRILEPENÚ HLAVIČKU ---
+        // =======================================================
+        jsonOutput.innerHTML = `<div class="table-scroll-wrapper">${tableHTML}</div>`;
+    }
+    // =======================================================
+    // --- KONIEC REFAKTORIZOVANEJ FUNKCIE ---
+    // =======================================================
 
     function updateDateInputType(minDate = null, maxDate = null) { 
-        const mode = viewMode.value;
-        const currentDateValue = dateInput.value;
-        let [year, month, day] = currentDateValue.split("-");
-        
-        if ("day" === mode) {
-            dateInput.type = "date";
-            if (minDate && maxDate) {
-                dateInput.min = minDate;
-                dateInput.max = maxDate;
-            }
-            dateInput.value = `${year}-${month}-${day || "01"}`;
-        } else {
-            dateInput.type = "month";
-            if (minDate && maxDate) {
-                dateInput.min = minDate.substring(0, 7);
-                dateInput.max = maxDate.substring(0, 7);
-            }
-            dateInput.value = `${year}-${month}`;
-        }
-    }
-    
-    async function init() { 
-        availableFiles = await fetchAvailableFiles();
-        const availableDataText = generateAvailableDataString(availableFiles);
-        availabilityInfo.innerHTML = `<p>Dostupné dáta: ${availableDataText}</p>`;
-        
-        const { min, max } = await getAvailableDateRange(availableFiles);
-        
-        // Nastavenie predvoleného dátumu na posledný dokončený mesiac
-        const today = new Date();
-        today.setDate(1); // Ísť na prvý deň aktuálneho mesiaca
-        today.setDate(today.getDate() - 1); // Ísť na posledný deň predchádzajúceho mesiaca
-        const year = today.getFullYear();
-        const month = String(today.getMonth() + 1).padStart(2, "0");
-        
-        dateInput.value = `${year}-${month}`; // Predvolená hodnota je posledný mesiac
-        
-        updateDateInputType(min, max);
-        
-        viewMode.addEventListener("change", () => updateDateInputType(min, max));
-        loadDataButton.addEventListener("click", loadAndDisplayData);
-        
-        // Automatické načítanie dát pri štarte
-        if (dateInput.value) {
-            setTimeout(loadAndDisplayData, 0); 
-        }
-    }
+        const mode = viewMode.value;
+        const currentDateValue = dateInput.value;
+        let [year, month, day] = currentDateValue.split("-");
+        
+        if ("day" === mode) {
+            dateInput.type = "date";
+            if (minDate && maxDate) {
+                dateInput.min = minDate;
+                dateInput.max = maxDate;
+            }
+            dateInput.value = `${year}-${month}-${day || "01"}`;
+        } else {
+            dateInput.type = "month";
+            if (minDate && maxDate) {
+                dateInput.min = minDate.substring(0, 7);
+                dateInput.max = maxDate.substring(0, 7);
+            }
+            dateInput.value = `${year}-${month}`;
+        }
+    }
+    
+    async function init() { 
+        availableFiles = await fetchAvailableFiles();
+        const availableDataText = generateAvailableDataString(availableFiles);
+        availabilityInfo.innerHTML = `<p>Dostupné dáta: ${availableDataText}</p>`;
+        
+        const { min, max } = await getAvailableDateRange(availableFiles);
+        
+        // Nastavenie predvoleného dátumu na posledný dokončený mesiac
+        const today = new Date();
+        today.setDate(1); // Ísť na prvý deň aktuálneho mesiaca
+        today.setDate(today.getDate() - 1); // Ísť na posledný deň predchádzajúceho mesiaca
+        const year = today.getFullYear();
+        const month = String(today.getMonth() + 1).padStart(2, "0");
+        
+        dateInput.value = `${year}-${month}`; // Predvolená hodnota je posledný mesiac
+        
+        updateDateInputType(min, max);
+        
+        viewMode.addEventListener("change", () => updateDateInputType(min, max));
+        loadDataButton.addEventListener("click", loadAndDisplayData);
+        
+        // Automatické načítanie dát pri štarte
+        if (dateInput.value) {
+            setTimeout(loadAndDisplayData, 0); 
+        }
+    }
     
     init();
 });
