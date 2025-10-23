@@ -85,20 +85,19 @@ h1, h2 { color: var(--heading-color); text-align: center; }
     .hamburger.active .bar:nth-child(3) { transform: translateY(-8px) rotate(-45deg); }
     .control-panel, .control-panel.analysis-panel { grid-template-columns: 1fr; }
     
-    /* Vylepšenie pre mobilné tabuľky (denný/mesačný prehľad) */
-#json-data thead th {
-    /* Tieto dva riadky "prilepia" hlavičku */
-    position: -webkit-sticky; /* Prehliadače Apple (Safari) */
-    position: sticky;
-    
-    /* Prilepí sa úplne k vrchu obrazovky */
-    top: 0; 
-    
-    /* Zabezpečí, že hlavička bude VŽDY navrchu */
-    z-index: 10;
-    
-    /* Farba pozadia (už by mala byť nastavená z pôvodného štýlu, 
-       ale je dôležitá, aby posúvajúci sa obsah nepresvital) */
-    background-color: #f8f9fa; 
-}
-
+   /* Vylepšenie pre mobilné tabuľky (denný/mesačný prehľad) */
+    #json-data thead th {
+        position: -webkit-sticky; /* Prehliadače Apple (Safari) */
+        position: sticky;
+        
+        /* === OPRAVA 1: Prilepí sa POD navigačnú lištu (vysokú 70px) === */
+        top: 70px; 
+        
+        z-index: 10; /* Zabezpečí, že hlavička bude navrchu (nad obsahom tabuľky) */
+        
+        /* === OPRAVA 2: Použije dynamickú farbu pozadia podľa témy === */
+        background-color: var(--box-bg); 
+        
+        /* Znovu aplikujeme spodný okraj, ktorý by sa inak mohol stratiť */
+        border-bottom: 2px solid var(--heading-color); 
+    }
